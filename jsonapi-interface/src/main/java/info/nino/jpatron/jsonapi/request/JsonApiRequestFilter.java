@@ -5,17 +5,17 @@ import info.nino.jpatron.annotiation.JsonApiInject;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.helpers.RegexHelper;
-import javax.annotation.PostConstruct;
-import javax.enterprise.event.Event;
-import javax.inject.Inject;
-import javax.ws.rs.ForbiddenException;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.container.ResourceInfo;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.UriInfo;
-import javax.ws.rs.ext.Provider;
+import jakarta.annotation.PostConstruct;
+import jakarta.enterprise.event.Event;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.container.ResourceInfo;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.core.UriInfo;
+import jakarta.ws.rs.ext.Provider;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
@@ -92,7 +92,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
         }
 
         Class<?> dtoClass = jsonApiAnnot.value();
-        if(Object.class.equals(dtoClass)) return;    //dtoClass.isAnnotationPresent(javax.persistence.Entity)
+        if(Object.class.equals(dtoClass)) return;    //dtoClass.isAnnotationPresent(jakarta.persistence.Entity)
 
         boolean pagination = jsonApiAnnot.pagination();
         boolean distinct = jsonApiAnnot.distinctDataset();
