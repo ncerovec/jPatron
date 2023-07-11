@@ -1,9 +1,9 @@
 package info.nino.jpatron.jsonapi.request;
 
 import info.nino.jpatron.annotiation.JsonApiInject;
-import javax.enterprise.context.RequestScoped;
-import javax.enterprise.event.Observes;
-import javax.enterprise.inject.Produces;
+import jakarta.enterprise.context.RequestScoped;
+import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.inject.Produces;
 
 @RequestScoped
 public class JsonApiRequestProducer

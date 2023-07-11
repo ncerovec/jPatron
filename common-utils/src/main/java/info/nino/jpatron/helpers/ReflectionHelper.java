@@ -12,8 +12,8 @@ import java.util.*;
 
 public class ReflectionHelper
 {
-    private static final List<String> ENTITY_ANNOTATION_CLASSES = Arrays.asList("javax.persistence.Entity", "javax.persistence.Embeddable");
     public static final String PATH_SEPARATOR = "."; //PATH_DELIMITER
+    private static final List<String> ENTITY_ANNOTATION_CLASSES = Arrays.asList("jakarta.persistence.Entity", "jakarta.persistence.Embeddable");
 
     public static String getFieldNameFromPath(String fieldPath)
     {

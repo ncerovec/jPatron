@@ -1,6 +1,6 @@
 package info.nino.jpatron.annotiation;
 
-import javax.ws.rs.NameBinding;
+import jakarta.ws.rs.NameBinding;
 
 import java.lang.annotation.*;
 

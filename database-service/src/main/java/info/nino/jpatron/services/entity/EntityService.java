@@ -7,18 +7,22 @@ import info.nino.jpatron.helpers.DateTimeFormatUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.pagination.Page;
 import info.nino.jpatron.pagination.PageRequest;
-import javax.persistence.*;
-import javax.persistence.criteria.*;
-import javax.persistence.metamodel.Attribute;
-import javax.persistence.metamodel.Bindable;
+import jakarta.persistence.*;
+import jakarta.persistence.criteria.*;
+import jakarta.persistence.metamodel.Attribute;
+import jakarta.persistence.metamodel.Bindable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.text.WordUtils;
+import org.apache.commons.text.WordUtils;
 import org.hibernate.cfg.AvailableSettings;
-import org.hibernate.jpa.QueryHints;
-import org.hibernate.query.criteria.internal.path.AbstractPathImpl;
+import org.hibernate.jpa.HibernateHints;
+import org.hibernate.jpa.SpecHints;
+import org.hibernate.query.sqm.tree.SqmCopyContext;
+import org.hibernate.query.sqm.tree.domain.AbstractSqmSimplePath;
+import org.hibernate.query.sqm.tree.select.SqmQuerySpec;
+import org.hibernate.query.sqm.tree.select.SqmSelectStatement;
 
 import java.lang.reflect.*;
 import java.math.BigDecimal;
@@ -370,7 +374,7 @@ public interface EntityService<E>
                 dataQuery.setHint(entityGraphHint.getKey(), entityGraphHint.getValue());
             }
 
-            dataQuery.setHint(QueryHints.HINT_READONLY, request.isReadOnlyDataset());
+            dataQuery.setHint(HibernateHints.HINT_READ_ONLY, request.isReadOnlyDataset());
 
             long queryStartTimeNs = System.nanoTime();
             List<E> contentResult = dataQuery.getResultList();
@@ -489,7 +493,7 @@ public interface EntityService<E>
             }
 
             TypedQuery<Tuple> aggregationQuery = em.createQuery(aggQuery);
-            aggregationQuery.setHint(QueryHints.HINT_READONLY, true);
+            aggregationQuery.setHint(HibernateHints.HINT_READ_ONLY, true);
 
             long queryStartTimeNs = System.nanoTime();
             Stream<Tuple> aggResult = aggregationQuery.getResultStream();
@@ -531,7 +535,7 @@ public interface EntityService<E>
             }
 
             TypedQuery<Tuple> distinctQuery = em.createQuery(distQuery);
-            distinctQuery.setHint(QueryHints.HINT_READONLY, true);
+            distinctQuery.setHint(HibernateHints.HINT_READ_ONLY, true);
 
             long queryStartTimeNs = System.nanoTime();
             Stream<Tuple> distinctResult = distinctQuery.getResultStream();
@@ -618,8 +622,8 @@ public interface EntityService<E>
                 }
 
                 //NOTICE: https://stackoverflow.com/questions/46455325/whats-the-difference-between-fetchgraph-and-loadgraph-in-jpa-2-1
-                //entityGraphHint = new AbstractMap.SimpleEntry<>(QueryHints.HINT_FETCHGRAPH, rootGraph); //javax.persistence.fetchgraph
-                entityGraphHint = new AbstractMap.SimpleEntry<>(QueryHints.HINT_LOADGRAPH, rootGraph); //javax.persistence.loadgraph
+                //entityGraphHint = new AbstractMap.SimpleEntry<>(SpecHints.HINT_SPEC_FETCH_GRAPH, rootGraph); //jakarta.persistence.fetchgraph
+                entityGraphHint = new AbstractMap.SimpleEntry<>(SpecHints.HINT_SPEC_LOAD_GRAPH, rootGraph); //jakarta.persistence.loadgraph
                 subgraphMap.clear(); //free-up memory
             }
 
@@ -846,7 +850,7 @@ public interface EntityService<E>
             Predicate filterPredicate = null;
 
             //AbstractPathImpl.class replaced with AbstractSqmSimplePath.class (since Hibernate 6.2.4.Final or earlier)
-            String fieldName = (AbstractPathImpl.class.isAssignableFrom(filterColumn.getClass())) ? ((AbstractPathImpl) filterColumn).getAttribute().getName() : ReflectionHelper.getFieldNameFromPath(filter.getColumnPath());
+            String fieldName = (AbstractSqmSimplePath.class.isAssignableFrom(filterColumn.getClass())) ? ((AbstractSqmSimplePath) filterColumn).getReferencedPathSource().getPathName() : ReflectionHelper.getFieldNameFromPath(filter.getColumnPath());
 
             Optional<Field> fieldOptional = ReflectionHelper.findModelField(filterColumn.getParentPath().getJavaType(), fieldName);
             if(!fieldOptional.isPresent()) throw new RuntimeException(String.format("Field '%s' NOT FOUND in ENTITY Class: %s!", fieldName, filterColumn.getParentPath().getJavaType().getSimpleName()));
@@ -1276,23 +1280,27 @@ public interface EntityService<E>
             return Core.replicateQuery(query, orgQuery);
         }
 
+        //WARNING (Hibernate v6): issues with reusing (copying) Predicates in CriteriaQuery where & having methods
+        //https://discourse.hibernate.org/t/possible-regression-5-6-to-6-1-sqmroot-not-yet-resolved-to-tablegroup/6554/15
+        //https://stackoverflow.com/questions/75066987/why-hibernate-6-throw-an-excetion-java-lang-illegalargumentexception-already-r
+        //https://stackoverflow.com/questions/74962038/hibernate-6-error-already-registered-a-copy-sqmbasicvaluedsimplepathfullyqua
+        //https://discourse.hibernate.org/t/hibernate-6-already-registered-a-copy/7641/2
+        //https://stackoverflow.com/questions/76316577/org-hibernate-sql-ast-sqltreecreationexception-could-not-locate-tablegroup-mo
         private static <T> CriteriaQuery<T> replicateQuery(CriteriaQuery<T> newQuery, CriteriaQuery<?> orgQuery)
         {
             //NOTICE: replicate all FromPaths (Root & Join) from original CriteriaQuery
-            Core.replicateFromRoots(newQuery, orgQuery.getRoots());
+            final SqmCopyContext pathContext = SqmCopyContext.simpleContext();
+            Core.replicateFromRoots(pathContext, newQuery, orgQuery.getRoots());
 
-            //NOTICE: using same Predicate from original CriteriaQuery
-            if(orgQuery.getRestriction() != null) newQuery.where(orgQuery.getRestriction());
-            if(orgQuery.getGroupRestriction() != null) newQuery.having(orgQuery.getGroupRestriction());
-
-            //TODO if needed - copy all Predicate.Expression from original CriteriaQuery:
-            //List<Expression> orgPredicates = new ArrayList<>(orgQuery.getRestriction().getExpressions());
-            //newQuery.where(orgPredicates.toArray(new Predicate[]{}));
+            //WARNING: "queryContext" must be different from "pathContext" to work when different CriteriaQuery from/select is used
+            final SqmCopyContext queryContext = SqmCopyContext.simpleContext();
+            SqmQuerySpec orgQuerySpec = ((SqmSelectStatement) orgQuery).getQuerySpec();
+            ((SqmSelectStatement) newQuery).setQueryPart(orgQuerySpec.copy(queryContext));
 
             return newQuery;
         }
 
-        private static void replicateFromRoots(CriteriaQuery<?> query, Set<Root<?>> roots)
+        private static void replicateFromRoots(SqmCopyContext copyContext, CriteriaQuery<?> query, Set<Root<?>> roots)
         {
             for(Root<?> r : roots)
             {
@@ -1304,14 +1312,15 @@ public interface EntityService<E>
                 {
                     root = query.from(r.getModel());
                     root.alias(r.getAlias());
+                    copyContext.registerCopy(r, root);
                 }
                 //else logger.warning(String.format("Existing RootPath (%s) FOUND for ENTITY Class: %s!", root.getAlias(), r.getJavaType().getSimpleName()));
 
-                Core.replicateFromJoins(root, r.getJoins());
+                Core.replicateFromJoins(copyContext, root, r.getJoins());
             }
         }
 
-        private static void replicateFromJoins(From<?, ?> root, Set<? extends Join<?, ?>> joins)
+        private static void replicateFromJoins(SqmCopyContext copyContext, From<?, ?> root, Set<? extends Join<?, ?>> joins)
         {
             if(root == null) throw new RuntimeException("JoinPath ROOT NOT FOUND!");
 
@@ -1325,10 +1334,11 @@ public interface EntityService<E>
                 //if(join == null) //NOTICE: avoid replicating duplicate Joins (might produce bug)
                 {
                     join = Core.addJoin(root, j.getAttribute().getName(), j.getJoinType(), j.getAlias());
+                    copyContext.registerCopy(j, join);
                 }
                 //else logger.warning(String.format("Existing JoinPath (%s) at '%s' FOUND for ENTITY Class: %s!", join.getAlias(), root.getAlias(), joinClass.getSimpleName()));
 
-                Core.replicateFromJoins(join, j.getJoins());
+                Core.replicateFromJoins(copyContext, join, j.getJoins());
             }
         }
 
