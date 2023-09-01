@@ -6,6 +6,10 @@ import org.apache.commons.collections4.MultiValuedMap;
 
 import java.util.*;
 
+/**
+ * Main Entity Service request object
+ * Contains parameters used for data/distinct/meta queries
+ */
 public class PageRequest
 {
     private Integer pageSize;
@@ -25,12 +29,24 @@ public class PageRequest
 
     private Set<EntityService.QueryExpression> metaColumns = new HashSet<>();
 
+    /**
+     * Constructor for PageRequest (data-service) with custom properties
+     * @param pageSize requested page size
+     * @param pageNumber requested page number
+     */
     public PageRequest(Integer pageSize, Integer pageNumber)
     {
         this.pageSize = pageSize;
         this.pageNumber = pageNumber;
     }
 
+    /**
+     * Constructor for PageRequest (data-service) with custom properties
+     * @param pageSize requested size of the result page
+     * @param pageNumber requested number of the result page
+     * @param distinct true/false parameter for distinct-list of the result list
+     * @param readOnly true/false parameter for the read-only result list
+     */
     public PageRequest(Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly)
     {
         this(pageSize, pageNumber);
@@ -38,12 +54,26 @@ public class PageRequest
         this.readOnlyDataset = readOnly;
     }
 
+    /**
+     * Constructor for PageRequest (data-service) with custom properties
+     * @param pageSize requested size of the result page
+     * @param pageNumber requested number of the result page
+     * @param sort set of sorting parameters of String type (e.g. "-name")
+     */
     public PageRequest(Integer pageSize, Integer pageNumber, Set<String> sort)
     {
         this(pageSize, pageNumber);
         if(sort != null) sort.forEach(this::addSort);
     }
 
+    /**
+     * Constructor for PageRequest (data-service) with custom properties
+     * @param pageSize requested size of the result page
+     * @param pageNumber requested number of the result page
+     * @param distinct true/false parameter for distinct-list of the result list
+     * @param readOnly true/false parameter for the read-only result list
+     * @param sorts set of sorting parameters of Sort type
+     */
     public PageRequest(Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly, Set<Sort> sorts)
     {
         this(pageSize, pageNumber);
@@ -52,6 +82,10 @@ public class PageRequest
         this.sorts = sorts;
     }
 
+    /**
+     * Constructor for PageRequest (data-service) by generic ApiRequest (common-utils)
+     * @param apiRequest generic ApiRequest (common-utils) parameter
+     */
     public PageRequest(ApiRequest apiRequest)
     {
         //add page & orders
@@ -229,11 +263,20 @@ public class PageRequest
         this.entityGraphPaths = entityGraphPaths;
     }
 
+    /**
+     * Adds sorting parameter to PageRequest object
+     * @param name sorting column-name parameter of type String
+     * @param dir sorting direction parameter of type Sort.Direction
+     */
     public void addSort(String name, Sort.Direction dir)
     {
         sorts.add(new Sort(name, dir));
     }
 
+    /**
+     * Adds sorting parameter to PageRequest object
+     * @param sort sorting parameter including direction & column-name of type String (e.g. "-name")
+     */
     public void addSort(String sort)
     {
         sort = sort.trim(); //remove leading and trailing spaces ('+' can be serialized as space)
@@ -278,6 +321,10 @@ public class PageRequest
         this.metaColumns = metaColumns;
     }
 
+
+    /**
+     * SubClass for sorting parameters
+     */
     public static class Sort
     {
         private Class<?> entity;
@@ -285,12 +332,23 @@ public class PageRequest
         private String columnPath;
         private Direction direction;
 
+        /**
+         * Constructor for Sort object
+         * @param columnPath sorting column name
+         * @param direction sorting direction
+         */
         Sort(String columnPath, Direction direction)
         {
             this.columnPath = columnPath;
             this.direction = direction;
         }
 
+        /**
+         * Constructor for Sort object
+         * @param entity sorting entity class
+         * @param columnPath sorting column name
+         * @param direction sorting direction
+         */
         public Sort(Class<?> entity, String columnPath, Direction direction)
         {
             this.entity = entity;
@@ -298,6 +356,13 @@ public class PageRequest
             this.direction = direction;
         }
 
+        /**
+         * Constructor for Sort object
+         * @param entity sorting entity class
+         * @param sortType sorting type class (e.g. sort as integer while column is string)
+         * @param columnPath sorting column name
+         * @param direction sorting direction
+         */
         public Sort(Class<?> entity, Class<?> sortType, String columnPath, Direction direction)
         {
             this.entity = entity;
@@ -326,10 +391,19 @@ public class PageRequest
             return direction;
         }
 
+
+        /**
+         * Enum used as direction for Sort parameters
+         */
         public enum Direction
         {
             ASC, DESC;
 
+            /**
+             * Resolves String ("+"/"-") to Direction enum (ASC/DESC)
+             * @param directionSign
+             * @return
+             */
             public static Direction resolveDirectionSign(String directionSign)
             {
                 if(("-").equals(directionSign)) return Direction.DESC;
