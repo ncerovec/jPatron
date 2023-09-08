@@ -47,13 +47,13 @@ public interface EntityService<E>
 
     Base baseInstance = null;
 
-    /**
+/**
      * Getter for EntityManager provider of the target Entity
      * @return EntityManager object
      */
     public EntityManager getEntityManager();
 
-    /**
+/**
      * Enable/Disable logging (disabled by default)
      * @return boolean true/false
      */
@@ -110,7 +110,7 @@ public interface EntityService<E>
     //    //WARNING: hardcoded/static Joins MUST have ALIAS to work properly!
     //}
 
-    /**
+/**
      * Main data-query method - fetches list of target entity objects from datasource
      * @param request (PageRequest) with query parameters (filters, pagination, sorting, etc...)
      * @return Page object with list of target Entity objects from DB
@@ -123,10 +123,10 @@ public interface EntityService<E>
         return this.getQueryBuilderInstance().dataQuery(em, entity, request);
     }
 
-    /**
+/**
      * Main distinct-query method - fetches distinct-value list of requested properties from datasource
      * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
-     * @return Map (requested properties) of Maps (distinct-values & their keys/counterparts) containing distinct-values of requested properties
+     * @return Map (requested properties) of Maps (distinct-values &amp; their keys/counterparts) containing distinct-values of requested properties
      */
     default Map<String, Map<Object, Object>> distinctQuery(PageRequest request)
     {
@@ -154,10 +154,10 @@ public interface EntityService<E>
         return this.getQueryBuilderInstance().getDistinctValues(em, query, entity, request.getDistinctColumns());
     }
 
-    /**
+/**
      * Main meta-query method - fetches aggregated-value list of requested properties from datasource
      * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
-     * @return Map (requested properties) of Maps (distinct-values & their keys/counterparts) containing distinct-values of requested properties
+     * @return Map (requested properties) of Maps (distinct-values &amp; their keys/counterparts) containing distinct-values of requested properties
      */
     default Map<String, Map<Object, Object>> metaQuery(PageRequest request)
     {
@@ -392,7 +392,7 @@ public interface EntityService<E>
             //MSSQL DISTINCT+SORT technical-limitation: sorting by non-select fields is not allowed when using DISTINCT clause
             //ERROR: ORDER BY items must appear in the select list if SELECT DISTINCT is specified
             //WORKAROUND: add Sort-Field-Entity to Entity-Graph select list (eager load sort-entity with root-select query)
-            if(query.isDistinct())
+            if(query.isDistinct())  //TODO: check if DBMS = MSSQL
             {
                 this.extendEntityGraphBySortEntities(request);
             }
@@ -1452,8 +1452,8 @@ public interface EntityService<E>
         private static <T> Join<?, T> addJoin(From<?, ?> path, String joinField, JoinType joinType, String alias)
         {
             Join<?, T> join = path.join(joinField, joinType);
-            String joinAlias = (alias != null) ? alias : joinField;
-            join.alias(joinAlias);
+            //String joinAlias = (alias != null) ? alias : joinField;
+            //join.alias(joinAlias);
 
             return join;
         }
@@ -1755,6 +1755,9 @@ public interface EntityService<E>
         private static <T> Path<T> findOrGenerateFieldJoinPath(Set<? extends From<?,?>> roots, Class<?> parentEntity, Class<?> fieldEntity, String fieldPath)
         {
             Path<T> fieldColumnPath = null;
+
+            //NOTICE: Hibernate auto-join could NOT be used since it uses 'JOIN' instead of 'LEFT JOIN' which results with unexpected reduced resultset
+            //if(true) return (Path<T>) Core.generateFieldPath(roots, parentEntity, fieldPath);
 
             if(StringUtils.isNotBlank(fieldPath))
             {
