@@ -12,6 +12,9 @@ import jakarta.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.util.logging.Logger;
 
+/**
+ * JSON:API response filter implementation
+ */
 @JsonApi
 @Provider
 public class JsonApiResponseFilter implements ContainerResponseFilter
@@ -29,7 +32,7 @@ public class JsonApiResponseFilter implements ContainerResponseFilter
 	public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) throws IOException {
 		if (responseContext.getEntity() instanceof JsonApiResponse) {//!ri.getResourceClass().isAnnotationPresent(JsonApi.class)) {
 			//TODO
-			//responseContext.getHeaders().add("Content-Type", "application/vnd.api+json");
+			responseContext.getHeaders().add("Content-Type", "application/vnd.api+json");
 		}
 
 		//responseContext.setEntity(

@@ -1,5 +1,6 @@
-# jPatron - Object-Oriented JPA Data Framework
+# jPatron - Object-Oriented JPA Data Library
 - Open Source JAVA libraries for object-oriented data handling - from API request to DB query back to API response.
+
 
 
 ## [Object-Oriented Database Service - Documentation](./database-service/README.md)
@@ -12,11 +13,12 @@
 - Query Engine will convert your OQL to JPA Criteria query effortlessly
 
 ### Maven (pom.xml)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/info.nino.jpatron/badge.svg)](https://maven-badges.herokuapp.com/maven-central/info.nino.jpatron)
 ```xml
 <dependency>
   <groupId>info.nino.jpatron</groupId>
   <artifactId>database-service</artifactId>
-  <version>${data-service.version}</version>
+  <version>${jpatron.version}</version>
 </dependency>
 ```
 
@@ -24,13 +26,29 @@
 - Library implements JSON:API REST interface for RestEasy resources (endpoints)
 - Hooks onto jPatron database-service which enables JSON:API requests similar to GraphQL
 - Provides custom filtering & searching options using HTTP Query Parameters
-- 
 
 ### Maven (pom.xml)
 ```xml
 <dependency>
   <groupId>info.nino.jpatron</groupId>
   <artifactId>jsonapi-interface</artifactId>
-  <version>${data-service.version}</version>
+  <version>${jpatron.version}</version>
+</dependency>
+```
+## jPatron BOM
+ - Easiest way to keep all jPatron artefacts of compatible versions is to include
+**jpatron-bom** in `<dependencyManagement>` section of your `pom.xml`
+ - When using BOM you don't have to specify version for every other jPatron artefact 
+in `<dependencies>` section of your  `pom.xml`, just specify it as `<scope>provided</scope>`
+and all jPatron dependencies will follow version of **jpatron-bom** artefact.
+
+### Maven (pom.xml)
+```xml
+<dependency>
+    <groupId>info.nino.jpatron</groupId>
+    <artifactId>jpatron-bom</artifactId>
+    <version>${jpatron.version}</version>
+    <scope>import</scope>
+    <type>pom</type>
 </dependency>
 ```

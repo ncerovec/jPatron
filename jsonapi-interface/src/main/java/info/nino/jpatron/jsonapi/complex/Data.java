@@ -6,6 +6,10 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Type of `data` property object inside JsonApiResponse object
+ * @param <T> type of embedded resource object
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "id", "type", "attributes", "relationships", "meta" })
 public class Data<T> implements java.io.Serializable {
