@@ -12,7 +12,7 @@ public class Page<T> extends ApiPageResponse<T>
 {
     /**
      * Constructor for main result data object returned by Entity Service
-     * @param pageRequest initializes Page number & size from request
+     * @param pageRequest initializes Page number &amp; size from request
      * @param totalElements total number of target entity objects in datasource (by filters)
      * @param content result list of the target entity objects (size of page-size)
      */
@@ -35,7 +35,7 @@ public class Page<T> extends ApiPageResponse<T>
 
     /**
      * Converts Page from one result class to diffrent one using provided mapper function
-     * @param mapper function used for mapping between source & target classes
+     * @param mapper function used for mapping between source &amp; target classes
      * @return converted Page with data result list of target class
      * @param <R> target Class of converter function
      */

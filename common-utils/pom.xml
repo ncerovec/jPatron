@@ -3,14 +3,15 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>info.nino.jpatron</groupId>
         <artifactId>jpatron</artifactId>
         <version>1.0.1-SNAPSHOT</version>
     </parent>
-
     <artifactId>common-utils</artifactId>
-    <name>jPatron - common-utils</name>
+
+    <name>${project.parent.groupId}:${project.artifactId}</name>
     <description>jPatron - common-utils module</description>
 
     <properties>

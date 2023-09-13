@@ -50,13 +50,13 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
 
     @Inject
     @ConfigProperty(name = ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, defaultValue = BooleanUtils.TRUE)
-    private Boolean throwInvalidPathExceptions;
+    Boolean throwInvalidPathExceptions;
 
     @Context
     ResourceInfo resourceInfo;
 
     //@Context
-    //private HttpServletRequest request;
+    //HttpServletRequest request;
 
     @Inject
     @JsonApiInject

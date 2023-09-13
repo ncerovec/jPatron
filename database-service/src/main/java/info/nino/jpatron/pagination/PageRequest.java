@@ -275,7 +275,7 @@ public class PageRequest
 
     /**
      * Adds sorting parameter to PageRequest object
-     * @param sort sorting parameter including direction & column-name of type String (e.g. "-name")
+     * @param sort sorting parameter including direction &amp; column-name of type String (e.g. "-name")
      */
     public void addSort(String sort)
     {
