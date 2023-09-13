@@ -43,8 +43,16 @@ public interface EntityService<E>
 
     Base baseInstance = null;
 
+    /**
+     * Getter for EntityManager provider of the target Entity
+     * @return EntityManager object
+     */
     public EntityManager getEntityManager();
 
+    /**
+     * Enable/Disable logging (disabled by default)
+     * @return boolean true/false
+     */
     default boolean isLoggingEnabled()
     {
         return false;
@@ -69,6 +77,12 @@ public interface EntityService<E>
         return new QueryBuilder<E>(this, pb);
     }
 
+    /**
+     * Returns target entity Class
+     * It's resolved automagically by reflection (it might not work in some special inheritance cases)
+     * You can override this method and return target entity Class manually
+     * @return target entity Class
+     */
     //public Class<E> entityClass = null;
     default Class<E> getEntityClass()
     {
@@ -92,6 +106,11 @@ public interface EntityService<E>
     //    //WARNING: hardcoded/static Joins MUST have ALIAS to work properly!
     //}
 
+    /**
+     * Main data-query method - fetches list of target entity objects from datasource
+     * @param request (PageRequest) with query parameters (filters, pagination, sorting, etc...)
+     * @return Page object with list of target Entity objects from DB
+     */
     default Page<E> dataQuery(PageRequest request)
     {
         Class<E> entity = this.getEntityClass();
@@ -100,6 +119,11 @@ public interface EntityService<E>
         return this.getQueryBuilderInstance().dataQuery(em, entity, request);
     }
 
+    /**
+     * Main distinct-query method - fetches distinct-value list of requested properties from datasource
+     * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
+     * @return Map (requested properties) of Maps (distinct-values & their keys/counterparts) containing distinct-values of requested properties
+     */
     default Map<String, Map<Object, Object>> distinctQuery(PageRequest request)
     {
         Class<E> entity = this.getEntityClass();
@@ -126,6 +150,11 @@ public interface EntityService<E>
         return this.getQueryBuilderInstance().getDistinctValues(em, query, entity, request.getDistinctColumns());
     }
 
+    /**
+     * Main meta-query method - fetches aggregated-value list of requested properties from datasource
+     * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
+     * @return Map (requested properties) of Maps (distinct-values & their keys/counterparts) containing distinct-values of requested properties
+     */
     default Map<String, Map<Object, Object>> metaQuery(PageRequest request)
     {
         Class<E> entity = this.getEntityClass();

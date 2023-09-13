@@ -31,12 +31,18 @@
 
     <licenses>
         <license>
-            <name>MIT</name>
+            <name>MIT License</name>
             <url>LICENSE.md</url>
             <distribution>repo</distribution>
             <comments>A business-friendly OSS license</comments>
         </license>
     </licenses>
+
+    <scm>
+        <url>https://github.com/ncerovec/jPatron</url>
+        <connection>scm:git:git://github.com/ncerovec/jPatron.git</connection>
+        <developerConnection>scm:git:git@github.com:ncerovec/jPatron.git</developerConnection>
+    </scm>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
