@@ -12,6 +12,9 @@ import javax.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.util.logging.Logger;
 
+/**
+ * JSON:API response filter implementation
+ */
 @JsonApi
 @Provider
 public class JsonApiResponseFilter implements ContainerResponseFilter

@@ -12,21 +12,59 @@ import java.util.*;
  */
 public class PageRequest
 {
+    /**
+     * Requested page size
+     */
     private Integer pageSize;
+
+    /**
+     * Requested page number
+     */
     private Integer pageNumber;
 
+    /**
+     * true/false flag for distinct-list of the result list
+     */
     private boolean distinctDataset = true;
+
+    /**
+     * true/false flag for the read-only result list
+     */
     private boolean readOnlyDataset = false;
 
-    private String[] fetchEntityPaths;      //paths for related entities to fetch
-    private String[] entityGraphPaths;      //paths for related entities to load
+    /**
+     * Paths for related entities to fetch (along with base resource)
+     */
+    private String[] fetchEntityPaths;
 
+    /**
+     * Paths for related entities to load (along with base resource)
+     */
+    private String[] entityGraphPaths;
+
+    /**
+     * Set of sorting parameters of Sort type
+     */
     private Set<Sort> sorts = new HashSet<>();
 
+    /**
+     * EntityService query-filters
+     * Filters which should be used to construct SQL 'where' clause
+     * Filters are applied to every query in the request (data/distinct/meta)
+     */
     private EntityService.QueryExpression.Conditional queryFilters = new EntityService.QueryExpression.Conditional();
 
+    /**
+     * EntityService distinct-values query request
+     * Columns which should be returned as result of distinct-query result
+     */
     private Set<EntityService.QueryExpression> distinctColumns = new HashSet<>();
 
+
+    /**
+     * EntityService meta-values query request
+     * Columns which should be returned as result of aggregate-query result
+     */
     private Set<EntityService.QueryExpression> metaColumns = new HashSet<>();
 
     /**
@@ -44,8 +82,8 @@ public class PageRequest
      * Constructor for PageRequest (data-service) with custom properties
      * @param pageSize requested size of the result page
      * @param pageNumber requested number of the result page
-     * @param distinct true/false parameter for distinct-list of the result list
-     * @param readOnly true/false parameter for the read-only result list
+     * @param distinct true/false flag for distinct-list of the result list
+     * @param readOnly true/false flag for the read-only result list
      */
     public PageRequest(Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly)
     {
@@ -70,8 +108,8 @@ public class PageRequest
      * Constructor for PageRequest (data-service) with custom properties
      * @param pageSize requested size of the result page
      * @param pageNumber requested number of the result page
-     * @param distinct true/false parameter for distinct-list of the result list
-     * @param readOnly true/false parameter for the read-only result list
+     * @param distinct true/false flag for distinct-list of the result list
+     * @param readOnly true/false flag for the read-only result list
      * @param sorts set of sorting parameters of Sort type
      */
     public PageRequest(Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly, Set<Sort> sorts)
@@ -213,51 +251,91 @@ public class PageRequest
         }
     }
 
+    /**
+     * Requested page number
+     * @return pageNumber
+     */
     public Integer getPageNumber()
     {
         return pageNumber;
     }
 
+    /**
+     * Requested page size
+     * @return pageSize
+     */
     public Integer getPageSize()
     {
         return pageSize;
     }
 
+    /**
+     * Boolean flag if result-set should be read-only
+     * @return readOnlyDataset flag
+     */
     public boolean isReadOnlyDataset()
     {
         return readOnlyDataset;
     }
 
+    /**
+     * Set requested result-set to be read-only
+     * @param readOnlyDataset boolean flag
+     */
     public void setReadOnlyDataset(boolean readOnlyDataset)
     {
         this.readOnlyDataset = readOnlyDataset;
     }
 
+    /**
+     * Boolean flag if result-set should be distinct
+     * @return distinctDataset flag
+     */
     public boolean isDistinctDataset()
     {
         return distinctDataset;
     }
 
+    /**
+     * set requested result-set to be distinct
+     * @param distinctDataset boolean flag
+     */
     public void setDistinctDataset(boolean distinctDataset)
     {
         this.distinctDataset = distinctDataset;
     }
 
+    /**
+     * Paths for related entities to fetch (along with base resource)
+     * @return fetchEntityPaths array
+     */
     public String[] getFetchEntityPaths()
     {
         return fetchEntityPaths;
     }
 
+    /**
+     * Paths for related entities to fetch (along with base resource)
+     * @param fetchEntityPaths array
+     */
     public void setFetchEntityPaths(String[] fetchEntityPaths)
     {
         this.fetchEntityPaths = fetchEntityPaths;
     }
 
+    /**
+     * Paths for related entities to load (along with base resource)
+     * @return entityGraphPaths array
+     */
     public String[] getEntityGraphPaths()
     {
         return entityGraphPaths;
     }
 
+    /**
+     * Paths for related entities to load (along with base resource)
+     * @param entityGraphPaths array
+     */
     public void setEntityGraphPaths(String[] entityGraphPaths)
     {
         this.entityGraphPaths = entityGraphPaths;
@@ -286,41 +364,68 @@ public class PageRequest
         else this.addSort(sort, Sort.Direction.ASC);
     }
 
+    /**
+     * Set of sorting parameters of Sort type
+     * @return sorts set
+     */
     public Set<Sort> getSorts()
     {
         return sorts;
     }
 
+    /**
+     * EntityService query-filters
+     * @return queryFilters complex object
+     */
     public EntityService.QueryExpression.Conditional getQueryFilters()
     {
         return queryFilters;
     }
 
+    /**
+     * EntityService query-filters
+     * @param queryFilters complex object
+     */
     public void setQueryFilters(EntityService.QueryExpression.Conditional queryFilters)
     {
         this.queryFilters = queryFilters;
     }
 
+    /**
+     * EntityService distinct-values query request
+     * @return distinctColumns set
+     */
     public Set<EntityService.QueryExpression> getDistinctColumns()
     {
         return distinctColumns;
     }
 
+    /**
+     * EntityService distinct-values query request
+     * @param distinctColumns set
+     */
     public void setDistinctColumns(Set<EntityService.QueryExpression> distinctColumns)
     {
         this.distinctColumns = distinctColumns;
     }
 
+    /**
+     * EntityService meta-values query request
+     * @return metaColumns set
+     */
     public Set<EntityService.QueryExpression> getMetaColumns()
     {
         return metaColumns;
     }
 
+    /**
+     * EntityService meta-values query request
+     * @param metaColumns set
+     */
     public void setMetaColumns(Set<EntityService.QueryExpression> metaColumns)
     {
         this.metaColumns = metaColumns;
     }
-
 
     /**
      * SubClass for sorting parameters
@@ -334,7 +439,7 @@ public class PageRequest
 
         /**
          * Constructor for Sort object
-         * @param columnPath sorting column name
+         * @param columnPath sorting column name or path
          * @param direction sorting direction
          */
         Sort(String columnPath, Direction direction)
@@ -346,7 +451,7 @@ public class PageRequest
         /**
          * Constructor for Sort object
          * @param entity sorting entity class
-         * @param columnPath sorting column name
+         * @param columnPath sorting column name or path
          * @param direction sorting direction
          */
         public Sort(Class<?> entity, String columnPath, Direction direction)
@@ -360,7 +465,7 @@ public class PageRequest
          * Constructor for Sort object
          * @param entity sorting entity class
          * @param sortType sorting type class (e.g. sort as integer while column is string)
-         * @param columnPath sorting column name
+         * @param columnPath sorting column name or path
          * @param direction sorting direction
          */
         public Sort(Class<?> entity, Class<?> sortType, String columnPath, Direction direction)
@@ -371,21 +476,33 @@ public class PageRequest
             this.direction = direction;
         }
 
+        /**
+         * @return sorting entity class
+         */
         public Class<?> getEntity()
         {
             return entity;
         }
 
+        /**
+         * @return sorting type class
+         */
         public Class<?> getSortType()
         {
             return sortType;
         }
 
+        /**
+         * @return sorting column name or path
+         */
         public String getColumnPath()
         {
             return columnPath;
         }
 
+        /**
+         * @return sorting direction
+         */
         public Direction getDirection()
         {
             return direction;

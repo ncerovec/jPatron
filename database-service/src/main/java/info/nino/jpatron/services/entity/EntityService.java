@@ -30,6 +30,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Backbone implementation of entity query engine
+ * @param <E> type of entity resource object
+ */
 //TODO: refactoring using JAVA 11+ Interface private methods
 //@LocalBean  //WARNING: JavaBean has to be annotated as @LocalBean when implementing interface!
 public interface EntityService<E>
@@ -41,15 +45,13 @@ public interface EntityService<E>
     //@PersistenceContext(unitName = "primary")
     //EntityManager em = null;
 
-    Base baseInstance = null;
-
-/**
+    /**
      * Getter for EntityManager provider of the target Entity
      * @return EntityManager object
      */
     public EntityManager getEntityManager();
 
-/**
+    /**
      * Enable/Disable logging (disabled by default)
      * @return boolean true/false
      */
@@ -106,7 +108,7 @@ public interface EntityService<E>
     //    //WARNING: hardcoded/static Joins MUST have ALIAS to work properly!
     //}
 
-/**
+    /**
      * Main data-query method - fetches list of target entity objects from datasource
      * @param request (PageRequest) with query parameters (filters, pagination, sorting, etc...)
      * @return Page object with list of target Entity objects from DB
@@ -119,7 +121,7 @@ public interface EntityService<E>
         return this.getQueryBuilderInstance().dataQuery(em, entity, request);
     }
 
-/**
+    /**
      * Main distinct-query method - fetches distinct-value list of requested properties from datasource
      * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
      * @return Map (requested properties) of Maps (distinct-values &amp; their keys/counterparts) containing distinct-values of requested properties
@@ -150,7 +152,7 @@ public interface EntityService<E>
         return this.getQueryBuilderInstance().getDistinctValues(em, query, entity, request.getDistinctColumns());
     }
 
-/**
+    /**
      * Main meta-query method - fetches aggregated-value list of requested properties from datasource
      * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
      * @return Map (requested properties) of Maps (distinct-values &amp; their keys/counterparts) containing distinct-values of requested properties
@@ -181,6 +183,10 @@ public interface EntityService<E>
         return this.getQueryBuilderInstance().getMetaValues(em, query, entity, request.getMetaColumns());
     }
 
+    /**
+     * EntityService.Base implements base methods of EntityService query engine
+     * @param <E> type of entity resource object
+     */
     public class Base<E>
     {
         private EntityService<E> es = null;
@@ -292,6 +298,10 @@ public interface EntityService<E>
         */
     }
 
+    /**
+     * EntityService.QueryBuilder implements essential interface methods of EntityService query engine
+     * @param <E> type of entity resource object
+     */
     public static class QueryBuilder<E>
     {
         private EntityService<E> es = null;
@@ -777,6 +787,10 @@ public interface EntityService<E>
         }
     }
 
+    /**
+     * EntityService.PredicateBuilder implements methods used for building simple or combined JPA Predicate objects
+     * @param <E> type of entity resource object
+     */
     public static class PredicateBuilder<E>
     {
         private EntityService<E> es = null;
@@ -866,9 +880,12 @@ public interface EntityService<E>
 
         /**
          * Method resolves & updates Filter.values for applied EntityService.AttributeMapper
+         * @param cb target CriteriaBuilder object (used for JPA Criteria query)
+         * @param query
+         * @param filterColumn
          * @param filter
          * @param <T>
-         * @return
+         * @return built JPA Predicate used for JPA Criteria builder query
          */
         private <T extends Comparable<? super T>> Predicate createFilterPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Path<? extends T> filterColumn, QueryExpression.Filter<T> filter)
         {
@@ -1268,7 +1285,10 @@ public interface EntityService<E>
         }
     }
 
-
+    /**
+     * EntityService.Core implements "backbone" methods of EntityService query engine
+     * Methods are mostly static which encourages stateless (helper-like) properties of implementation
+     */
     public static class Core
     {
         private static <E> CriteriaQuery<E> createEntityQuery(CriteriaBuilder cb, Class<E> clazz)
@@ -1796,6 +1816,9 @@ public interface EntityService<E>
         }
     }
 
+    /**
+     * EntityService.PredicateUtil implements static utility methods for modifying JPA Predicate objects
+     */
     public static class PredicateUtil
     {
         private static Predicate combinePredicates(CriteriaBuilder cb, Predicate pred1, Predicate pred2, QueryExpression.Conditional.Operator operator)
@@ -1826,8 +1849,9 @@ public interface EntityService<E>
         }
     }
 
-    //UTIL METHODS
-
+    /**
+     *  EntityService.EsUtil implements utility (non-essential) methods of EntityService query engine
+     */
     public static class EsUtil
     {
         public static <E> void logQuery(QueryType queryType, TypedQuery<E> dataQuery, long queryStartTimeNs)
@@ -1924,8 +1948,9 @@ public interface EntityService<E>
         }
     }
 
-    //HELPER METHODS
-
+    /**
+     *  EntityService.Helper implements helper methods which could also be utilized outside of EntityService query engine
+     */
     public static class Helper
     {
         private static Class<?> findGenericClassImplementation(Class<?> genericImpl, Class<?> genericClass)
@@ -2051,9 +2076,14 @@ public interface EntityService<E>
         }
     }
 
-    //EntityService.AttributeMapper
-    //NOTICE: filtering by EntityService.AttributeMapper Fields works only for same type AttributeConverter<T,T>
-    //WARNING: EntityService.AttributeMapper Fields should (at the moment) be read-only when using different type AttributeConverter<X,Y>
+    /**
+     * EntityService.AttributeMapper is experimental implementation of JPA AttributeConverter
+     * It is meant to provide EntityService features for the custom attribute types which are mapped from/to entity values to/from DB values
+     * NOTICE: filtering by EntityService.AttributeMapper Fields works only for same type AttributeConverter&lt;T,T&gt;
+     * WARNING: EntityService.AttributeMapper Fields should (at the moment) be read-only when using different type AttributeConverter&lt;X,Y&gt;
+     * @param <X> Entity type of value
+     * @param <Y> Database type of value
+     */
     public static interface AttributeMapper<X,Y extends Comparable<? super Y>> extends AttributeConverter<X,Y>
     {
         //public Class<X> getEntityType();
@@ -2127,9 +2157,11 @@ public interface EntityService<E>
         }
     }
 
-    //SQL QUERY META-MODEL
-
-    public static class QueryExpression  //NOTICE: Meta/Distinct Values Query meta-model
+    /**
+     * EntityService.QueryExpression is Object-Oriented Query Language metamodel for EntityService Query Engine
+     * Metamodel implementation for Data/Distinct/Aggregate queries used in EntityService.QueryBuilder
+     */
+    public static class QueryExpression
     {
         public enum Func { COUNT, COUNT_DISTINCT, SUM, AVG, MIN, MAX; }
 
@@ -2424,6 +2456,9 @@ public interface EntityService<E>
         }
     }
 
+    /**
+     * Enum types of query used in EntityService.QueryBuilder
+     */
     public static enum QueryType
     {
         DATA, DISTINCT, AGGREGATION;
