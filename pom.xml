@@ -59,7 +59,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <surefire-plugin.version>3.0.0-M7</surefire-plugin.version>
-        <compiler-plugin.version>3.11.0</compiler-plugin.version>
+        <compiler-plugin.version>3.8.1</compiler-plugin.version>
         <resources-plugin.version>3.3.1</resources-plugin.version>
         <sources-plugin.version>3.3.0</sources-plugin.version>
         <javadocs-plugin.version>3.5.0</javadocs-plugin.version>
