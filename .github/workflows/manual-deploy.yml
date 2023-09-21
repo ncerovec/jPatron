@@ -1,10 +1,11 @@
 name: jPatron Manual Deploy
 on:
   workflow_dispatch:
-    branch:
-      description: "The branch to checkout when running Maven deploy."
-      required: true
-      default: "master"
+    inputs:
+      branch:
+        description: "The branch to checkout when running Maven deploy."
+        required: true
+        default: "master"
 
 jobs:
   deploy:

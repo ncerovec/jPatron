@@ -1,10 +1,16 @@
 name: jPatron Master Build
 on: 
-  push:
-    branches:
-      - master
-    tags-ignore:
-      - jPatron-*
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "The branch to checkout when running Maven deploy."
+        required: true
+        default: "master"
+#  push:
+#    branches:
+#      - master
+#    tags-ignore:
+#      - jPatron-*
 
 jobs:
   deploy:
