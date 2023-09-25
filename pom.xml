@@ -67,8 +67,6 @@
         <staging-plugin.version>1.6.13</staging-plugin.version>
         <release-plugin.version>3.0.1</release-plugin.version>
 
-        <gpg.keyname>82D141F7352292A1</gpg.keyname>
-
         <!-- common dependencies versions -->
         <apache.lang.version>3.12.0</apache.lang.version>
         <apache.collections.version>4.4</apache.collections.version>
@@ -280,8 +278,6 @@
                                     <goal>sign</goal>
                                 </goals>
                                 <configuration>
-                                    <keyname>${gpg.keyname}</keyname>
-                                    <passphraseServerId>${gpg.keyname}</passphraseServerId>
                                     <gpgArguments>
                                         <arg>--pinentry-mode</arg>
                                         <arg>loopback</arg>

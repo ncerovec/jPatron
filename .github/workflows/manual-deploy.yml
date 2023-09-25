@@ -12,6 +12,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Configure GPG Key
+        run: |
+          # Install gpg secret key
+          echo -n "$GPG_SIGNING_KEY" | base64 --decode | gpg --batch --import
+          # Verify gpg secret key
+          gpg --list-secret-keys --keyid-format LONG
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.OSSRH_GPG_SIGNING_KEY_BASE64 }}
+
       - name: Checkout jPatron source code
         uses: actions/checkout@v2
         with:
@@ -30,8 +39,8 @@ jobs:
         with:
           java-version: 1.8
 
-      - name: Deploy snapshots with Maven
-        run: mvn -B deploy --file pom.xml -s .maven-settings.xml -DretryFailedDeploymentCount=10
+      - name: Deploy with Maven
+        run: mvn clean deploy -B -P release --file pom.xml -s .maven-settings.xml -Dgpg.passphrase=${{ secrets.OSSRH_GPG_SIGNING_KEY_PASSPHRASE }} -DretryFailedDeploymentCount=10
         env:
           CI_DEPLOY_USERNAME: ${{ secrets.CI_DEPLOY_USERNAME }}
           CI_DEPLOY_PASSWORD: ${{ secrets.CI_DEPLOY_PASSWORD }}
