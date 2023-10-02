@@ -15,20 +15,15 @@
         </server>
     </servers>
 
-    <activeProfiles>
-        <activeProfile>ossrh</activeProfile>
-    </activeProfiles>
- 
     <profiles>
 		<profile>
-		  <id>ossrh</id>
-		  <activation>
-			<activeByDefault>true</activeByDefault>
-		  </activation>
-		  <properties>
-			<gpg.executable>gpg</gpg.executable>
-			<gpg.passphrase>${env.CI_GPG_PASSPHRASE}</gpg.passphrase>
-		  </properties>
+            <id>release</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <gpg.executable>gpg</gpg.executable>
+            </properties>
 		</profile>
     </profiles>
 </settings>
