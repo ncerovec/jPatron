@@ -233,7 +233,6 @@
                     <!-- <arguments>-X -e</arguments> -->
                     <releaseProfiles>release</releaseProfiles>
                     <autoVersionSubmodules>true</autoVersionSubmodules>
-                    <updateWorkingCopyVersions>false</updateWorkingCopyVersions>
                 </configuration>
             </plugin>
         </plugins>
