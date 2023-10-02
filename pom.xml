@@ -45,7 +45,7 @@
         <tag>HEAD</tag>
         <url>https://github.com/ncerovec/jPatron</url>
         <connection>scm:git:git://github.com/ncerovec/jPatron.git</connection>
-        <developerConnection>scm:git:ssh://github.com:ncerovec/jPatron.git</developerConnection>
+        <developerConnection>scm:git:https://github.com/ncerovec/jPatron.git</developerConnection>
         <!-- <developerConnection>scm:git:git@github.com:ncerovec/jPatron.git</developerConnection> -->
     </scm>
 
