@@ -32,6 +32,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+/**
+ * JSON:API request filter implementation
+ */
 @JsonApi
 @Provider
 //@PreMatching
@@ -50,13 +53,13 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
 
     @Inject
     @ConfigProperty(name = ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, defaultValue = BooleanUtils.TRUE)
-    private Boolean throwInvalidPathExceptions;
+    Boolean throwInvalidPathExceptions;
 
     @Context
     ResourceInfo resourceInfo;
 
     //@Context
-    //private HttpServletRequest request;
+    //HttpServletRequest request;
 
     @Inject
     @JsonApiInject

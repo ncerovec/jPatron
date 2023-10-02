@@ -1,0 +1,20 @@
+name: jPatron Pull Request Test
+on: pull_request
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout jPatron Source Code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: 17
+        distribution: 'temurin'
+        cache: 'maven'
+    
+    - name: Build and Test with Maven
+      run: mvn package -B -e --file pom.xml

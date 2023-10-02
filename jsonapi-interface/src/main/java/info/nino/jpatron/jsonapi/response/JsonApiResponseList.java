@@ -9,6 +9,10 @@ import info.nino.jpatron.response.ApiPageResponse;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * JSON:API response implementation
+ * @param <T> type of embedded resource object
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({"error", "type", "data", "meta"})
 public class JsonApiResponseList<T> extends JsonApiResponse<List<T>> implements JsonResponseInterface
