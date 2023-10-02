@@ -13,7 +13,7 @@
 - Query Engine will convert your OQL to JPA Criteria query effortlessly
 
 ### Maven (pom.xml)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/info.nino.jpatron/badge.svg)](https://maven-badges.herokuapp.com/maven-central/info.nino.jpatron)
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/info.nino.jpatron/jpatron/badge.svg)](https://maven-badges.herokuapp.com/maven-central/info.nino.jpatron/jpatron)
 ```xml
 <dependency>
   <groupId>info.nino.jpatron</groupId>

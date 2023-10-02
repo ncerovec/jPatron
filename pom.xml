@@ -42,6 +42,7 @@
     </licenses>
 
     <scm>
+        <tag>HEAD</tag>
         <url>https://github.com/ncerovec/jPatron</url>
         <connection>scm:git:git://github.com/ncerovec/jPatron.git</connection>
         <developerConnection>scm:git:ssh://github.com:ncerovec/jPatron.git</developerConnection>
@@ -212,7 +213,15 @@
                     <serverId>ossrh</serverId>
                     <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
                     <stagingProfileId>release</stagingProfileId>
+                    <stagingRepositoryId>${project.groupId}:${project.artifactId}:${project.version}</stagingRepositoryId>
+                    <skipStaging>true</skipStaging>
+                    <keepStagingRepositoryOnCloseRuleFailure>true</keepStagingRepositoryOnCloseRuleFailure>
                     <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                    <autoDropAfterRelease>true</autoDropAfterRelease>
+                    <tags>
+                        <localUsername>${env.USER}</localUsername>
+                        <javaVersion>${java.version}</javaVersion>
+                    </tags>
                 </configuration>
             </plugin>
             <plugin>
@@ -220,10 +229,11 @@
                 <artifactId>maven-release-plugin</artifactId>
                 <version>${release-plugin.version}</version>
                 <configuration>
-                    <autoVersionSubmodules>true</autoVersionSubmodules>
-                    <useReleaseProfile>true</useReleaseProfile>
+                    <goals>deploy</goals>
+                    <!-- <arguments>-X -e</arguments> -->
                     <releaseProfiles>release</releaseProfiles>
-                    <goals>deploy nexus-staging:release</goals>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <updateWorkingCopyVersions>false</updateWorkingCopyVersions>
                 </configuration>
             </plugin>
         </plugins>

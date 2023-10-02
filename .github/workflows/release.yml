@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: "The branch to checkout when cutting the release."
+        description: "The 'git-ref' to checkout when cutting the release."
         required: true
-        default: "master"
+        default: "main"
       releaseVersion:
         description: "Default version to use when preparing a release."
         required: true
@@ -21,22 +21,21 @@ jobs:
 
     steps:
       - name: Checkout jPatron Source Code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.branch }}
 
-      - name: Cache local Maven repository
-        uses: actions/cache@v2
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-maven-
-
       - name: Set up JDK 1.8
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v3
         with:
           java-version: 1.8
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: ossrh # Value of the distributionManagement/repository/id field of the pom.xml
+          server-username: CI_DEPLOY_USERNAME # env variable for username in deploy
+          server-password: CI_DEPLOY_PASSWORD # env variable for token in deploy
+          gpg-private-key: ${{ secrets.OSSRH_GPG_SIGNING_KEY_TEXT }} # Value of the GPG private key to import
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE # env variable for GPG private key passphrase
 
       - name: Configure Git User
         run: |
@@ -44,9 +43,17 @@ jobs:
           git config user.name "GitHub Actions"
 
       - name: Cut jPatron Release
-        run: mvn release:prepare release:perform -B -s .maven-settings.xml -DreleaseVersion=${{ github.event.inputs.releaseVersion }} -DdevelopmentVersion=${{ github.event.inputs.developmentVersion }}
+        run: >
+            mvn release:prepare release:perform -B -e
+            -Dtag=${{github.event.inputs.releaseVersion}}
+            -DreleaseVersion=${{github.event.inputs.releaseVersion}}
+            -DscmReleaseCommitComment="@{prefix} @{artifactId} - release version @{releaseLabel}"
+            -DdevelopmentVersion=${{github.event.inputs.developmentVersion}}
+            -DscmDevelopmentCommitComment="@{prefix} @{artifactId} - snapshot version ${{github.event.inputs.developmentVersion}}"
+            -Dgpg.passphrase=${{secrets.OSSRH_GPG_SIGNING_KEY_PASSPHRASE}}
         env:
           CI_DEPLOY_USERNAME: ${{ secrets.CI_DEPLOY_USERNAME }}
           CI_DEPLOY_PASSWORD: ${{ secrets.CI_DEPLOY_PASSWORD }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.OSSRH_GPG_SIGNING_KEY_PASSPHRASE }}
