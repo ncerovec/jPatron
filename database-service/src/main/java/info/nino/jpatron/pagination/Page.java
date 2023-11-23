@@ -1,10 +1,9 @@
 package info.nino.jpatron.pagination;
 
+import info.nino.jpatron.metamodel.PageRequest;
 import info.nino.jpatron.response.ApiPageResponse;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 

@@ -1,6 +1,8 @@
 package info.nino.jpatron.helpers;
 
 import info.nino.jpatron.annotiation.EntityClass;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
@@ -135,13 +137,13 @@ public class ReflectionHelper
         return fieldOptional;
     }
 
-    public static Map.Entry<Class<?>, String> findEntityFieldByPath(Class<?> clazz, String path, boolean allowEntityDive) throws RuntimeException
+    public static Pair<Class<?>, String> findEntityFieldByPath(Class<?> clazz, String path, boolean allowEntityDive) throws RuntimeException
     {
         LinkedList<String> paths = ReflectionHelper.pathToLinkedList(path);
         return ReflectionHelper.findEntityFieldByPath(clazz, paths, null, allowEntityDive);
     }
 
-    private static Map.Entry<Class<?>, String> findEntityFieldByPath(Class<?> clazz, LinkedList<String> paths, String prefixPath, boolean allowEntityDive) throws RuntimeException
+    private static Pair<Class<?>, String> findEntityFieldByPath(Class<?> clazz, LinkedList<String> paths, String prefixPath, boolean allowEntityDive) throws RuntimeException
     {
         String findField = paths.removeFirst();
 
@@ -174,15 +176,15 @@ public class ReflectionHelper
             prefixPath = (prefixPath != null) ? prefixPath + ReflectionHelper.PATH_SEPARATOR + pathField.getValue() : pathField.getValue();   //current field entity-path
 
             //String remainingPath = String.join(ReflectionHelper.PATH_SEPARATOR, paths);
-            //Map.Entry<Class<?>, String> nextField = ReflectionHelper.findClassFieldByPath(nextClass, remainingPath, allowEntityDive);
-            Map.Entry<Class<?>, String> nextField = ReflectionHelper.findEntityFieldByPath(nextClass, paths, prefixPath, allowEntityDive);
+            //Pair<Class<?>, String> nextField = ReflectionHelper.findClassFieldByPath(nextClass, remainingPath, allowEntityDive);
+            Pair<Class<?>, String> nextField = ReflectionHelper.findEntityFieldByPath(nextClass, paths, prefixPath, allowEntityDive);
 
             return nextField;
         }
         else
         {
             //NOTICE: method resolveEntityClassAndFieldName() invokes back findFieldByPath() recursion if field is path!
-            Map.Entry<Class<?>, String> finalField = ReflectionHelper.resolveEntityClassAndFieldName(clazz, field);
+            Pair<Class<?>, String> finalField = ReflectionHelper.resolveEntityClassAndFieldName(clazz, field);
 
             //extend finalField name with path to root entity
             if(prefixPath != null) finalField.setValue(prefixPath + ReflectionHelper.PATH_SEPARATOR + finalField.getValue());
@@ -192,7 +194,7 @@ public class ReflectionHelper
     }
 
     //NOTICE: resolve real entity class & field name - with annotation fallbacks
-    private static Map.Entry<Class<?>, String> resolveEntityClassAndFieldName(Class<?> clazz, Field field)
+    private static Pair<Class<?>, String> resolveEntityClassAndFieldName(Class<?> clazz, Field field)
     {
         EntityClass fieldEntityClass = ReflectionHelper.getFieldOrAccessorOrMutatorAnnotation(clazz, field, EntityClass.class);
         if(clazz.isAnnotationPresent(EntityClass.class)) clazz = clazz.getAnnotation(EntityClass.class).value();
@@ -210,13 +212,31 @@ public class ReflectionHelper
             fieldName = pathField.getValue();
         }
 
+        ReflectionHelper.verifyIsEntityClass(clazz);
+        ReflectionHelper.verifyClassHasField(clazz, fieldName);
+
+        return new ImmutablePair<>(clazz, fieldName);
+    }
+
+    public static Class<?> resolveEntityClassFromDtoClass(Class<?> clazz)
+    {
+        if(clazz.isAnnotationPresent(EntityClass.class)) clazz = clazz.getAnnotation(EntityClass.class).value();
+
+        ReflectionHelper.verifyIsEntityClass(clazz);
+
+        return clazz;
+    }
+
+    private static void verifyIsEntityClass(Class<?> clazz)
+    {
         boolean isEntityClass = Arrays.stream(clazz.getAnnotations()).anyMatch(a -> ENTITY_ANNOTATION_CLASSES.contains(a.annotationType().getName()));
         if(!isEntityClass) throw new IllegalStateException(String.format("FINAL ENTITY Class is not @Entity/@Embeddable: %s!", clazz.getSimpleName()));
+    }
 
+    private static void verifyClassHasField(Class<?> clazz, String fieldName)
+    {
         Optional<Field> foundField = ReflectionHelper.findModelField(clazz, ReflectionHelper.getFieldNameFromPath(fieldName));
         if(!foundField.isPresent()) throw new IllegalStateException(String.format("Field '%s' NOT FOUND in FINAL ENTITY Class: %s!", fieldName, clazz.getSimpleName()));
-
-        return new AbstractMap.SimpleEntry(clazz, fieldName);
     }
 
     public static <T extends Annotation> T getFieldOrAccessorOrMutatorAnnotation(Field field, Class<T> annotationClass)

@@ -7,6 +7,7 @@ import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.helpers.RegexHelper;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.event.Event;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.container.ContainerRequestContext;
@@ -53,7 +54,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
 
     @Inject
     @ConfigProperty(name = ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, defaultValue = BooleanUtils.TRUE)
-    Boolean throwInvalidPathExceptions;
+    Instance<Boolean> configPropertyThrowInvalidPathExceptions;
 
     @Context
     ResourceInfo resourceInfo;
@@ -65,6 +66,8 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
     @JsonApiInject
     Event<JsonApiRequest> jsonApiRequestEvent;
 
+    private Boolean throwInvalidPathExceptions;
+
     protected Event<JsonApiRequest> getJsonApiRequestEvent()
     {
         return this.jsonApiRequestEvent;
@@ -73,10 +76,14 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
     @PostConstruct
     public void init()
     {
-        if(this.throwInvalidPathExceptions == null)
+        if(this.configPropertyThrowInvalidPathExceptions.isUnsatisfied())
         {
             String throwInvalidPathExceptionsConfig = System.getProperty(ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, BooleanUtils.TRUE);
             this.throwInvalidPathExceptions = BooleanUtils.toBoolean(throwInvalidPathExceptionsConfig);
+        }
+        else
+        {
+            this.throwInvalidPathExceptions = this.configPropertyThrowInvalidPathExceptions.get();
         }
     }
 
@@ -97,6 +104,8 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
         Class<?> dtoClass = jsonApiAnnot.value();
         if(Object.class.equals(dtoClass)) return;    //dtoClass.isAnnotationPresent(jakarta.persistence.Entity)
 
+        Class<?> entityClass = ReflectionHelper.resolveEntityClassFromDtoClass(dtoClass);
+
         boolean pagination = jsonApiAnnot.pagination();
         boolean distinct = jsonApiAnnot.distinctDataset();
         boolean readOnly = jsonApiAnnot.readOnlyDataset();
@@ -108,7 +117,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
         JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, allowEntityPaths, allowedPaths);
 
-        JsonApiRequest jsonApiRequest = new JsonApiRequest(queryParams, pagination, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
+        JsonApiRequest jsonApiRequest = new JsonApiRequest(entityClass, queryParams, pagination, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
         //this.getJsonApiRequestContext().setJsonApiRequest(jsonApiRequest);
         this.getJsonApiRequestEvent().fire(jsonApiRequest);
     }

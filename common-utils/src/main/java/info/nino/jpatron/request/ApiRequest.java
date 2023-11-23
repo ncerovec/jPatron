@@ -10,8 +10,13 @@ import java.util.Map;
  *  Generic abstract class for API request implementations
  *  It serves as abstract type which can be used across jPatron library artefacts with the concrete implementation in final interface artefact
  */
-public abstract class ApiRequest implements Serializable
+public abstract class ApiRequest<T> implements Serializable
 {
+    /**
+     * Root Entity for the request
+     */
+    protected Class<T> rootEntity;
+
     /**
      * Request query parameters
      */
@@ -52,6 +57,7 @@ public abstract class ApiRequest implements Serializable
 
     /**
      * Default constructor - with all mandatory parameters
+     * @param rootEntity {@link ApiRequest#rootEntity}
      * @param queryParams {@link ApiRequest#queryParams}
      * @param pagination {@link ApiRequest#pagination}
      * @param distinct {@link ApiRequest#distinctDataset}
@@ -59,14 +65,33 @@ public abstract class ApiRequest implements Serializable
      * @param fetchEntityPaths {@link ApiRequest#fetchEntityPaths}
      * @param entityGraphPaths {@link ApiRequest#entityGraphPaths}
      */
-    public ApiRequest(QueryParams queryParams, boolean pagination, boolean distinct, boolean readOnly, String[] fetchEntityPaths, String[] entityGraphPaths)
+    public ApiRequest(Class<T> rootEntity, QueryParams queryParams, boolean pagination, boolean distinct, boolean readOnly, String[] fetchEntityPaths, String[] entityGraphPaths)
     {
+        this.rootEntity = rootEntity;
         this.queryParams = queryParams;
         this.pagination = pagination;
         this.distinctDataset = distinct;
         this.readOnlyDataset = readOnly;
         this.fetchEntityPaths = fetchEntityPaths;
         this.entityGraphPaths = entityGraphPaths;
+    }
+
+    /**
+     * {@link ApiRequest#rootEntity}
+     * @return rootEntity
+     */
+    public Class<T> getRootEntity()
+    {
+        return rootEntity;
+    }
+
+    /**
+     * {@link ApiRequest#rootEntity}
+     * @param rootEntity object
+     */
+    public void setRootEntity(Class<T> rootEntity)
+    {
+        this.rootEntity = rootEntity;
     }
 
     /**
@@ -183,9 +208,6 @@ public abstract class ApiRequest implements Serializable
      */
     public static abstract class QueryParams implements Serializable
     {
-        /**
-         *
-         */
         protected Integer pageSize;
         protected Integer pageNumber;
         protected Map<String, Map.Entry<Class<?>, String>> sort;                          //SortFieldPath : Entity, SortDirection

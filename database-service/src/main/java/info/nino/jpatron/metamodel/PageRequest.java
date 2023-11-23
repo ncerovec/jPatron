@@ -1,8 +1,11 @@
-package info.nino.jpatron.pagination;
+package info.nino.jpatron.metamodel;
 
+import info.nino.jpatron.helpers.ReflectionHelper;
+import info.nino.jpatron.metamodel.QueryExpression;
 import info.nino.jpatron.request.ApiRequest;
-import info.nino.jpatron.services.entity.EntityService;
 import org.apache.commons.collections4.MultiValuedMap;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
 
@@ -10,8 +13,14 @@ import java.util.*;
  * Main Entity Service request object
  * Contains parameters used for data/distinct/meta queries
  */
-public class PageRequest
+//TODO fix: QueryExpression suffers from "telescoping constructors problem"
+public class PageRequest<T>
 {
+    /**
+     * Requested root Entity of the PageRequest
+     */
+    private Class<T> rootEntity;
+
     /**
      * Requested page size
      */
@@ -30,7 +39,7 @@ public class PageRequest
     /**
      * true/false flag for the read-only result list
      */
-    private boolean readOnlyDataset = false;
+    private boolean readOnlyDataset = true;
 
     /**
      * Paths for related entities to fetch (along with base resource)
@@ -52,69 +61,83 @@ public class PageRequest
      * Filters which should be used to construct SQL 'where' clause
      * Filters are applied to every query in the request (data/distinct/meta)
      */
-    private EntityService.QueryExpression.Conditional queryFilters = new EntityService.QueryExpression.Conditional();
+    private QueryExpression.Conditional queryFilters = new QueryExpression.Conditional();
 
     /**
      * EntityService distinct-values query request
      * Columns which should be returned as result of distinct-query result
      */
-    private Set<EntityService.QueryExpression> distinctColumns = new HashSet<>();
+    private Set<QueryExpression> distinctColumns = new HashSet<>();
 
 
     /**
      * EntityService meta-values query request
      * Columns which should be returned as result of aggregate-query result
      */
-    private Set<EntityService.QueryExpression> metaColumns = new HashSet<>();
+    private Set<QueryExpression> metaColumns = new HashSet<>();
 
     /**
      * Constructor for PageRequest (data-service) with custom properties
+     * @param rootEntity requested Entity result
+     */
+    public PageRequest(Class<T> rootEntity)
+    {
+        this.rootEntity = rootEntity;
+    }
+
+    /**
+     * Constructor for PageRequest (data-service) with custom properties
+     * @param rootEntity requested Entity result
      * @param pageSize requested page size
      * @param pageNumber requested page number
      */
-    public PageRequest(Integer pageSize, Integer pageNumber)
+    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber)
     {
+        this.rootEntity = rootEntity;
         this.pageSize = pageSize;
         this.pageNumber = pageNumber;
     }
 
     /**
      * Constructor for PageRequest (data-service) with custom properties
+     * @param rootEntity requested Entity result
      * @param pageSize requested size of the result page
      * @param pageNumber requested number of the result page
      * @param distinct true/false flag for distinct-list of the result list
      * @param readOnly true/false flag for the read-only result list
      */
-    public PageRequest(Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly)
+    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly)
     {
-        this(pageSize, pageNumber);
+        this(rootEntity, pageSize, pageNumber);
         this.distinctDataset = distinct;
         this.readOnlyDataset = readOnly;
     }
 
     /**
      * Constructor for PageRequest (data-service) with custom properties
+     * @param rootEntity requested Entity result
      * @param pageSize requested size of the result page
      * @param pageNumber requested number of the result page
      * @param sort set of sorting parameters of String type (e.g. "-name")
      */
-    public PageRequest(Integer pageSize, Integer pageNumber, Set<String> sort)
+    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, Set<String> sort)
     {
-        this(pageSize, pageNumber);
-        if(sort != null) sort.forEach(this::addSort);
+        this(rootEntity, pageSize, pageNumber);
+        if(sort != null) sort.forEach(s -> this.addSort(rootEntity, s));
     }
 
     /**
      * Constructor for PageRequest (data-service) with custom properties
+     * @param rootEntity requested Entity result
      * @param pageSize requested size of the result page
      * @param pageNumber requested number of the result page
      * @param distinct true/false flag for distinct-list of the result list
      * @param readOnly true/false flag for the read-only result list
      * @param sorts set of sorting parameters of Sort type
      */
-    public PageRequest(Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly, Set<Sort> sorts)
+    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly, Set<Sort> sorts)
     {
-        this(pageSize, pageNumber);
+        this(rootEntity, pageSize, pageNumber);
         this.distinctDataset = distinct;
         this.readOnlyDataset = readOnly;
         this.sorts = sorts;
@@ -124,10 +147,10 @@ public class PageRequest
      * Constructor for PageRequest (data-service) by generic ApiRequest (common-utils)
      * @param apiRequest generic ApiRequest (common-utils) parameter
      */
-    public PageRequest(ApiRequest apiRequest)
+    public PageRequest(ApiRequest<T> apiRequest)
     {
         //add page & orders
-        this((apiRequest.isPagination()) ? apiRequest.getQueryParams().getPageSize() : null, apiRequest.getQueryParams().getPageNumber());
+        this(apiRequest.getRootEntity(), (apiRequest.isPagination()) ? apiRequest.getQueryParams().getPageSize() : null, apiRequest.getQueryParams().getPageNumber());
 
         //set distinct
         this.distinctDataset = apiRequest.isDistinctDataset();
@@ -147,10 +170,10 @@ public class PageRequest
             for(Map.Entry<String, Map.Entry<Class<?>, String>> sf : apiRequest.getQueryParams().getSort().entrySet())
             {
                     String column = sf.getKey();
-                    Class entity = sf.getValue().getKey();
+                    //Class entity = sf.getValue().getKey();
                     Sort.Direction direction = Sort.Direction.resolveDirectionSign(sf.getValue().getValue());
 
-                    Sort querySort = new Sort(entity, column, direction);
+                    Sort querySort = new Sort(apiRequest.getRootEntity(), column, direction);
                     this.sorts.add(querySort);
             }
         }
@@ -164,13 +187,13 @@ public class PageRequest
                 {
                     for(Map.Entry<String, Collection<String>> fo : f.getValue().asMap().entrySet())
                     {
-                        Class entity = ef.getKey();
+                        //Class entity = ef.getKey();
                         String column = f.getKey();
-                        EntityService.QueryExpression.Filter.Cmp op = EntityService.QueryExpression.Filter.Cmp.valueOf(fo.getKey());
+                        QueryExpression.Filter.Cmp op = QueryExpression.Filter.Cmp.valueOf(fo.getKey());
                         String[] values = fo.getValue().toArray(new String[]{}); //Comparable[] values = f.getValue().toArray(new Comparable[]{});
 
-                        EntityService.QueryExpression.Filter queryFilter = new EntityService.QueryExpression.Filter(entity, column, op, values);
-                        this.queryFilters.getFilters().add(queryFilter);
+                        QueryExpression.Filter queryFilter = new QueryExpression.Filter(apiRequest.getRootEntity(), column, op, values);
+                        this.queryFilters.addFilters(queryFilter);
                     }
                 }
             }
@@ -179,7 +202,7 @@ public class PageRequest
         //add search columns
         if(apiRequest.getQueryParams().getSearches() != null)
         {
-            EntityService.QueryExpression.Conditional searchConditional = new EntityService.QueryExpression.Conditional(EntityService.QueryExpression.Conditional.Operator.OR);
+            QueryExpression.Conditional searchConditional = new QueryExpression.Conditional(QueryExpression.Conditional.Operator.OR);
 
             for(Map.Entry<Class<?>, Map<String, MultiValuedMap<String, String>>> es : apiRequest.getQueryParams().getSearches().entrySet())
             {
@@ -187,19 +210,19 @@ public class PageRequest
                 {
                     for(Map.Entry<String, Collection<String>> sm : s.getValue().asMap().entrySet())
                     {
-                        Class entity = es.getKey();
+                        //Class entity = es.getKey();
                         String column = s.getKey();
-                        EntityService.QueryExpression.Filter.Cmp searchOp = EntityService.QueryExpression.Filter.Cmp.LIKE;
-                        EntityService.QueryExpression.Filter.Modifier mod = EntityService.QueryExpression.Filter.Modifier.valueOf(sm.getKey());
+                        QueryExpression.Filter.Cmp searchOp = QueryExpression.Filter.Cmp.LIKE;
+                        QueryExpression.Filter.Modifier mod = QueryExpression.Filter.Modifier.valueOf(sm.getKey());
                         String[] values = sm.getValue().toArray(new String[]{});
 
-                        EntityService.QueryExpression.Filter querySearch = new EntityService.QueryExpression.Filter(entity, column, searchOp, mod, values);
-                        searchConditional.getFilters().add(querySearch);
+                        QueryExpression.Filter querySearch = new QueryExpression.Filter(apiRequest.getRootEntity(), column, searchOp, mod, values);
+                        searchConditional.addFilters(querySearch);
                     }
                 }
             }
 
-            this.queryFilters.getConditionals().add(searchConditional);
+            this.queryFilters.addConditionals(searchConditional);
         }
 
         //add distinct columns
@@ -213,11 +236,11 @@ public class PageRequest
 
                     for(String dl : df.getValue())
                     {
-                        Class entity = ed.getKey();
+                        //Class entity = ed.getKey();
                         String keyColumn = df.getKey();
                         String labelColumn = dl;
 
-                        EntityService.QueryExpression queryDistinct = new EntityService.QueryExpression(entity, keyColumn, labelColumn);
+                        QueryExpression queryDistinct = new QueryExpression(apiRequest.getRootEntity(), keyColumn, labelColumn);
                         this.distinctColumns.add(queryDistinct);
                     }
                 }
@@ -237,18 +260,28 @@ public class PageRequest
 
                         for(String ml : mf.getValue())
                         {
-                            Class entity = em.getKey();
+                            //Class entity = em.getKey();
                             String valueColumn = m.getKey();
-                            EntityService.QueryExpression.Func func = EntityService.QueryExpression.Func.valueOf(mf.getKey());
+                            QueryExpression.Func func = QueryExpression.Func.valueOf(mf.getKey());
                             String labelColumn = ml;
 
-                            EntityService.QueryExpression queryMeta = new EntityService.QueryExpression(entity, valueColumn, func, labelColumn);
+                            QueryExpression queryMeta = new QueryExpression(apiRequest.getRootEntity(), valueColumn, func, labelColumn);
                             this.metaColumns.add(queryMeta);
                         }
                     }
                 }
             }
         }
+    }
+
+
+    /**
+     * Requested root Entity of the PageRequest
+     * @return rootEntity
+     */
+    public Class<T> getRootEntity()
+    {
+        return rootEntity;
     }
 
     /**
@@ -343,25 +376,27 @@ public class PageRequest
 
     /**
      * Adds sorting parameter to PageRequest object
-     * @param name sorting column-name parameter of type String
+     * @param rootEntity query root entity (base for column path)
+     * @param columnPath sorting column-name parameter of type String
      * @param dir sorting direction parameter of type Sort.Direction
      */
-    public void addSort(String name, Sort.Direction dir)
+    public void addSort(Class<?> rootEntity, String columnPath, Sort.Direction dir)
     {
-        sorts.add(new Sort(name, dir));
+        sorts.add(new Sort(rootEntity, columnPath, dir));
     }
 
     /**
      * Adds sorting parameter to PageRequest object
+     * @param rootEntity query root entity (base for column path)
      * @param sort sorting parameter including direction &amp; column-name of type String (e.g. "-name")
      */
-    public void addSort(String sort)
+    public void addSort(Class<?> rootEntity, String sort)
     {
         sort = sort.trim(); //remove leading and trailing spaces ('+' can be serialized as space)
 
-        if(sort.startsWith("-")) this.addSort(sort.substring(1), Sort.Direction.DESC);
-        else if(sort.startsWith("+")) this.addSort(sort.substring(1), Sort.Direction.ASC);
-        else this.addSort(sort, Sort.Direction.ASC);
+        if(sort.startsWith("-")) this.addSort(rootEntity, sort.substring(1), Sort.Direction.DESC);
+        else if(sort.startsWith("+")) this.addSort(rootEntity, sort.substring(1), Sort.Direction.ASC);
+        else this.addSort(rootEntity, sort, Sort.Direction.ASC);
     }
 
     /**
@@ -377,7 +412,7 @@ public class PageRequest
      * EntityService query-filters
      * @return queryFilters complex object
      */
-    public EntityService.QueryExpression.Conditional getQueryFilters()
+    public QueryExpression.Conditional getQueryFilters()
     {
         return queryFilters;
     }
@@ -386,7 +421,7 @@ public class PageRequest
      * EntityService query-filters
      * @param queryFilters complex object
      */
-    public void setQueryFilters(EntityService.QueryExpression.Conditional queryFilters)
+    public void setQueryFilters(QueryExpression.Conditional queryFilters)
     {
         this.queryFilters = queryFilters;
     }
@@ -395,7 +430,7 @@ public class PageRequest
      * EntityService distinct-values query request
      * @return distinctColumns set
      */
-    public Set<EntityService.QueryExpression> getDistinctColumns()
+    public Set<QueryExpression> getDistinctColumns()
     {
         return distinctColumns;
     }
@@ -404,7 +439,7 @@ public class PageRequest
      * EntityService distinct-values query request
      * @param distinctColumns set
      */
-    public void setDistinctColumns(Set<EntityService.QueryExpression> distinctColumns)
+    public void setDistinctColumns(Set<QueryExpression> distinctColumns)
     {
         this.distinctColumns = distinctColumns;
     }
@@ -413,7 +448,7 @@ public class PageRequest
      * EntityService meta-values query request
      * @return metaColumns set
      */
-    public Set<EntityService.QueryExpression> getMetaColumns()
+    public Set<QueryExpression> getMetaColumns()
     {
         return metaColumns;
     }
@@ -422,7 +457,7 @@ public class PageRequest
      * EntityService meta-values query request
      * @param metaColumns set
      */
-    public void setMetaColumns(Set<EntityService.QueryExpression> metaColumns)
+    public void setMetaColumns(Set<QueryExpression> metaColumns)
     {
         this.metaColumns = metaColumns;
     }
@@ -432,56 +467,45 @@ public class PageRequest
      */
     public static class Sort
     {
-        private Class<?> entity;
+        //private Class<?> rootEntity;
         private Class<?> sortType;
-        private String columnPath;
+        private Pair<Class<?>, String> columnEntityPath;
         private Direction direction;
 
         /**
          * Constructor for Sort object
+         * @param rootEntity query root entity (base for column path)
          * @param columnPath sorting column name or path
          * @param direction sorting direction
          */
-        Sort(String columnPath, Direction direction)
+        Sort(Class<?> rootEntity, String columnPath, Direction direction)
         {
-            this.columnPath = columnPath;
+            //this.rootEntity = rootEntity;
+            this.columnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, columnPath, true);
             this.direction = direction;
         }
 
         /**
          * Constructor for Sort object
-         * @param entity sorting entity class
-         * @param columnPath sorting column name or path
-         * @param direction sorting direction
-         */
-        public Sort(Class<?> entity, String columnPath, Direction direction)
-        {
-            this.entity = entity;
-            this.columnPath = columnPath;
-            this.direction = direction;
-        }
-
-        /**
-         * Constructor for Sort object
-         * @param entity sorting entity class
+         * @param rootEntity query root entity (base for column path)
          * @param sortType sorting type class (e.g. sort as integer while column is string)
          * @param columnPath sorting column name or path
          * @param direction sorting direction
          */
-        public Sort(Class<?> entity, Class<?> sortType, String columnPath, Direction direction)
+        public Sort(Class<?> rootEntity, String columnPath, Direction direction, Class<?> sortType)
         {
-            this.entity = entity;
-            this.sortType = sortType;
-            this.columnPath = columnPath;
+            //this.rootEntity = rootEntity;
+            this.columnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, columnPath, true);
             this.direction = direction;
+            this.sortType = sortType;
         }
 
         /**
-         * @return sorting entity class
+         * @return pair of sort entity & column name OR path (from root entity)
          */
-        public Class<?> getEntity()
+        public Pair<Class<?>, String> getColumnEntityPath()
         {
-            return entity;
+            return columnEntityPath;
         }
 
         /**
@@ -490,14 +514,6 @@ public class PageRequest
         public Class<?> getSortType()
         {
             return sortType;
-        }
-
-        /**
-         * @return sorting column name or path
-         */
-        public String getColumnPath()
-        {
-            return columnPath;
         }
 
         /**
