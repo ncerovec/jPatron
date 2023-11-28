@@ -1,6 +1,5 @@
 package info.nino.jpatron.request;
 
-import info.nino.jpatron.response.ApiPageResponse;
 import org.apache.commons.collections4.MultiValuedMap;
 
 import java.io.Serializable;

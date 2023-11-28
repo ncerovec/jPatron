@@ -6,7 +6,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * QueryExpression is Object-Oriented Query Language metamodel for EntityService Query Engine
@@ -15,7 +14,10 @@ import java.util.List;
 //TODO fix: QueryExpression suffers from "telescoping constructors problem"
 public class QueryExpression
 {
+    public enum LogicOperator { AND, OR; }
+    public enum CompareOperator { TRUE, FALSE, IsNULL, IsNotNULL, IsEMPTY, IsNotEMPTY, EQ, NEQ, LIKE, GT, LT, GToE, LToE, IN, NotIN, EACH, NotEACH, EXCEPT, NotEXCEPT; }
     public enum Func { COUNT, COUNT_DISTINCT, SUM, AVG, MIN, MAX; }
+    public enum ValueModifier { NONE, LikeL, LikeR, LikeLR, SPLIT, SplitLikeL, SplitLikeR, SplitLikeLR; }
 
     private String name;                                    //arbitrary name for QueryExpression (meta-value fields naming)
     private Class<?> rootEntity;                            //query root entity (base for value/label paths)
@@ -166,40 +168,43 @@ public class QueryExpression
         return String.format("(%s) <%s> %s:%s - FILTERS(%s)", this.getValueColumnEntityPath().getKey().getSimpleName(), this.getFunc(),  this.getValueColumnEntityPath().getValue(), this.getLabelColumnEntityPath().getValue(), filtersString);
     }
 
-    public static class Conditional //NOTICE: Complex Logical Conditional Filters
+    public static class CompoundFilter //NOTICE: Complex Logical Conditional Filters (ex Conditional)
     {
-        public enum Operator { AND, OR; }
-
         //NOTICE: filters & conditionals can be null (memory usage reduction) - initialized HashSet only for programming convenience
         private Filter<?>[] filters;                                //simple root filters
-        private Conditional[] conditionals;                         //complex/compound nested sub-filters
-        private Operator logicOperator = Operator.AND;              //logical compound operator for filters & conditionals
+        private CompoundFilter[] compoundFilters;                   //complex/compound nested sub-filters
+        private LogicOperator logicOperator = LogicOperator.AND;    //logical compound operator for filters & conditionals
 
-        public Conditional() { }
+        public CompoundFilter() { }
 
-        public Conditional(Operator logicOperator)
+        public CompoundFilter(LogicOperator logicOperator)
         {
             this.logicOperator = logicOperator;
         }
 
-        public Conditional(Filter<?>... filters)
+        public CompoundFilter(Filter<?>... filters)
         {
             this.filters = filters;
         }
 
-        public Conditional(Operator logicOperator, Filter<?>... filters)
+        public CompoundFilter(LogicOperator logicOperator, Filter<?>... filters)
         {
             this.logicOperator = logicOperator;
             this.filters = filters;
         }
 
-        public Conditional(Operator logicOperator, Conditional... conditionals)
+        public CompoundFilter(LogicOperator logicOperator, CompoundFilter... compoundFilters)
         {
             this.logicOperator = logicOperator;
-            this.conditionals = conditionals;
+            this.compoundFilters = compoundFilters;
         }
 
-        public Operator getLogicOperator()
+        public void setLogicOperator(LogicOperator logicOperator)
+        {
+            this.logicOperator = logicOperator;
+        }
+
+        public LogicOperator getLogicOperator()
         {
             return logicOperator;
         }
@@ -214,47 +219,39 @@ public class QueryExpression
             this.filters = ArrayUtils.addAll(this.filters, filters);
         }
 
-        public Conditional[] getConditionals()
+        public CompoundFilter[] getCompoundFilters()
         {
-            return conditionals;
+            return compoundFilters;
         }
 
-        public void addConditionals(Conditional... conditionals)
+        public void addCompoundFilters(CompoundFilter... compoundFilters)
         {
-            this.conditionals = ArrayUtils.addAll(this.conditionals, conditionals);
+            this.compoundFilters = ArrayUtils.addAll(this.compoundFilters, compoundFilters);
         }
 
         @Override
         public String toString()
         {
             String operatorString = String.format(" %s ", this.getLogicOperator());
-            return String.format("(%s) %s (%s)", Joiner.on(operatorString).skipNulls().join(this.getFilters()), operatorString, Joiner.on(operatorString).skipNulls().join(this.getConditionals()));
+            return String.format("(%s) %s (%s)", Joiner.on(operatorString).skipNulls().join(this.getFilters()), operatorString, Joiner.on(operatorString).skipNulls().join(this.getCompoundFilters()));
         }
     }
 
     public static class Filter<T extends Comparable<? super T>>
     {
-        public enum Cmp { TRUE, FALSE, IsNULL, IsNotNULL, IsEMPTY, IsNotEMPTY, EQ, NEQ, LIKE, GT, LT, GToE, LToE, IN, NotIN, EACH, NotEACH, EXCEPT, NotEXCEPT; }
-        public enum Modifier { NONE, LikeL, LikeR, LikeLR, SPLIT, SplitLikeL, SplitLikeR, SplitLikeLR; }
+        private String name;                                            //arbitrary name for Filter (meta-value fields naming)
+        private Class<?> rootEntity;                                    //filter root entity (base for value/label paths)
+        private Pair<Class<?>, String> columnEntityPath;                //pair of entity & column name OR path (from root entity)
+        private CompareOperator compareOperator = CompareOperator.EQ;   //filter comparison operator (default: Cmp.EQ)
+        private ValueModifier valueModifier = ValueModifier.NONE;       //filter value format (default: Modifier.NONE)
+        private T[] value;                                              //filter value(s)
+        //private String subquery;                                      //filter subquery
 
-        public static List<Cmp> booleanComparators = Arrays.asList(Cmp.TRUE, Cmp.FALSE);
-        public static List<Cmp> subqueryComparators = Arrays.asList(Cmp.EACH, Cmp.NotEACH, Cmp.EXCEPT, Cmp.NotEXCEPT);
-        public static List<Cmp> nonValueComparators = Arrays.asList(Cmp.IsNULL, Cmp.IsNotNULL, Cmp.IsEMPTY, Cmp.IsNotEMPTY);
-        public static List<Cmp> valueComparators = Arrays.asList(Cmp.EQ, Cmp.NEQ, Cmp.LIKE, Cmp.GT, Cmp.LT, Cmp.GToE, Cmp.LToE, Cmp.IN, Cmp.NotIN, Cmp.EACH, Cmp.NotEACH, Cmp.EXCEPT, Cmp.NotEXCEPT);
-
-        private String name;                                //arbitrary name for Filter (meta-value fields naming)
-        private Class<?> rootEntity;                        //filter root entity (base for value/label paths)
-        private Pair<Class<?>, String> columnEntityPath;    //pair of entity & column name OR path (from root entity)
-        private Cmp cmp = Cmp.EQ;                           //filter comparison operator (default: Cmp.EQ)
-        private Modifier mod = Modifier.NONE;               //filter value format (default: Modifier.NONE)
-        private T[] value;                                  //filter value(s)
-        //private String subquery;                          //filter subquery
-
-        public Filter(Class<?> rootEntity, String columnPath, Cmp cmp)
+        public Filter(Class<?> rootEntity, String columnPath, CompareOperator compareOperator)
         {
             this.rootEntity = rootEntity;
             this.columnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, columnPath, true);
-            this.cmp = cmp;
+            this.compareOperator = compareOperator;
         }
 
         public Filter(Class<?> rootEntity, String columnPath, T... value)
@@ -264,29 +261,29 @@ public class QueryExpression
             this.value = value;
         }
 
-        public Filter(Class<?> rootEntity, String columnPath, Cmp cmp, T... value)
+        public Filter(Class<?> rootEntity, String columnPath, CompareOperator compareOperator, T... value)
         {
             this.rootEntity = rootEntity;
             this.columnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, columnPath, true);
-            this.cmp = cmp;
+            this.compareOperator = compareOperator;
             this.value = value;
         }
 
-        public Filter(Class<?> rootEntity, String columnPath, Cmp cmp, Modifier mod, T[] value)
+        public Filter(Class<?> rootEntity, String columnPath, CompareOperator compareOperator, ValueModifier valueModifier, T... value)
         {
             this.rootEntity = rootEntity;
             this.columnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, columnPath, true);
-            this.cmp = cmp;
-            this.mod = mod;
+            this.compareOperator = compareOperator;
+            this.valueModifier = valueModifier;
             this.value = value;
         }
 
-        public Filter(String name, Class<?> rootEntity, String columnPath, Cmp cmp, T... value)
+        public Filter(String name, Class<?> rootEntity, String columnPath, CompareOperator compareOperator, T... value)
         {
             this.name = name;
             this.rootEntity = rootEntity;
             this.columnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, columnPath, true);
-            this.cmp = cmp;
+            this.compareOperator = compareOperator;
             this.value = value;
         }
 
@@ -305,14 +302,14 @@ public class QueryExpression
             return columnEntityPath;
         }
 
-        public Cmp getCmp()
+        public CompareOperator getCompareOperator()
         {
-            return cmp;
+            return compareOperator;
         }
 
-        public Modifier getMod()
+        public ValueModifier getValueModifier()
         {
-            return mod;
+            return valueModifier;
         }
 
         public T[] getValue()
@@ -328,7 +325,7 @@ public class QueryExpression
         @Override
         public String toString()
         {
-            return String.format("'%s' (%s) <%s> %s", this.getColumnEntityPath().getValue(), this.getColumnEntityPath().getKey() != null ? this.getColumnEntityPath().getKey().getSimpleName() : null, this.getCmp(), Arrays.toString(this.getValue()));
+            return String.format("'%s' (%s) <%s> %s", this.getColumnEntityPath().getValue(), this.getColumnEntityPath().getKey() != null ? this.getColumnEntityPath().getKey().getSimpleName() : null, this.getCompareOperator(), Arrays.toString(this.getValue()));
         }
     }
 }

@@ -4,10 +4,9 @@ import com.google.common.collect.Sets;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.DateTimeFormatUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
+import info.nino.jpatron.metamodel.PageRequest;
 import info.nino.jpatron.metamodel.QueryExpression;
 import info.nino.jpatron.pagination.Page;
-import info.nino.jpatron.metamodel.PageRequest;
-import jakarta.inject.Inject;
 import jakarta.persistence.*;
 import jakarta.persistence.criteria.*;
 import jakarta.persistence.metamodel.Attribute;
@@ -49,6 +48,11 @@ public interface EntityService<E>
     Logger logger = Logger.getLogger(EntityService.class.getName());
 
     String LABEL_PATHS_SEPARATOR = ConstantsUtil.COMMA;
+
+    List<QueryExpression.CompareOperator> booleanComparators = Arrays.asList(QueryExpression.CompareOperator.TRUE, QueryExpression.CompareOperator.FALSE);
+    List<QueryExpression.CompareOperator> subqueryComparators = Arrays.asList(QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NotEACH, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.NotEXCEPT);
+    List<QueryExpression.CompareOperator> nonValueComparators = Arrays.asList(QueryExpression.CompareOperator.IsNULL, QueryExpression.CompareOperator.IsNotNULL, QueryExpression.CompareOperator.IsEMPTY, QueryExpression.CompareOperator.IsNotEMPTY);
+    List<QueryExpression.CompareOperator> valueComparators = Arrays.asList(QueryExpression.CompareOperator.EQ, QueryExpression.CompareOperator.NEQ, QueryExpression.CompareOperator.LIKE, QueryExpression.CompareOperator.GT, QueryExpression.CompareOperator.LT, QueryExpression.CompareOperator.GToE, QueryExpression.CompareOperator.LToE, QueryExpression.CompareOperator.IN, QueryExpression.CompareOperator.NotIN, QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NotEACH, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.NotEXCEPT);
 
     //@PersistenceContext(unitName = "primary")
     //EntityManager em = null;
@@ -148,7 +152,7 @@ public interface EntityService<E>
             List<Predicate> newPredicates = this.getQueryBuilderInstance().getFilters(cb, query, entity, request.getQueryFilters());
             for(Predicate p : newPredicates)
             {
-                queryPredicate = PredicateUtil.combinePredicates(cb, queryPredicate, p, QueryExpression.Conditional.Operator.AND);
+                queryPredicate = PredicateUtil.combinePredicates(cb, queryPredicate, p, QueryExpression.LogicOperator.AND);
             }
 
             if(queryPredicate != null)
@@ -179,7 +183,7 @@ public interface EntityService<E>
             List<Predicate> newPredicates = this.getQueryBuilderInstance().getFilters(cb, query, entity, request.getQueryFilters());
             for(Predicate p : newPredicates)
             {
-                queryPredicate = PredicateUtil.combinePredicates(cb, queryPredicate, p, QueryExpression.Conditional.Operator.AND);
+                queryPredicate = PredicateUtil.combinePredicates(cb, queryPredicate, p, QueryExpression.LogicOperator.AND);
             }
 
             if(queryPredicate != null)
@@ -520,8 +524,8 @@ public interface EntityService<E>
             Predicate orgPredicate = aggQuery.getRestriction();
             if(ArrayUtils.isNotEmpty(metaVQ.getFilters()))
             {
-                Predicate p = pb.createPredicate(cb, aggQuery, clazz, QueryExpression.Conditional.Operator.AND, metaVQ.getFilters());
-                orgPredicate = PredicateUtil.combinePredicates(cb, orgPredicate, p, QueryExpression.Conditional.Operator.AND);
+                Predicate p = pb.createPredicate(cb, aggQuery, clazz, QueryExpression.LogicOperator.AND, metaVQ.getFilters());
+                orgPredicate = PredicateUtil.combinePredicates(cb, orgPredicate, p, QueryExpression.LogicOperator.AND);
             }
 
             if(orgPredicate != null)
@@ -575,8 +579,8 @@ public interface EntityService<E>
             Predicate orgPredicate = distQuery.getRestriction();
             if(ArrayUtils.isNotEmpty(metaVQ.getFilters()))
             {
-                Predicate p = pb.createPredicate(cb, distQuery, clazz, QueryExpression.Conditional.Operator.AND, metaVQ.getFilters());
-                orgPredicate = PredicateUtil.combinePredicates(cb, orgPredicate, p, QueryExpression.Conditional.Operator.AND);
+                Predicate p = pb.createPredicate(cb, distQuery, clazz, QueryExpression.LogicOperator.AND, metaVQ.getFilters());
+                orgPredicate = PredicateUtil.combinePredicates(cb, orgPredicate, p, QueryExpression.LogicOperator.AND);
             }
 
             if(orgPredicate != null)
@@ -693,11 +697,11 @@ public interface EntityService<E>
             if(CollectionUtils.isNotEmpty(entityGraphPaths)) request.setEntityGraphPaths(entityGraphPaths.toArray(new String[]{}));
         }
 
-        private List<Predicate> getFilters(CriteriaBuilder cb, CriteriaQuery<?> query, Class<E> clazz, QueryExpression.Conditional queryFilters)
+        private List<Predicate> getFilters(CriteriaBuilder cb, CriteriaQuery<?> query, Class<E> clazz, QueryExpression.CompoundFilter queryFilters)
         {
             List<Predicate> predicates = new ArrayList<>();
 
-            Predicate complexConditionalPredicate = pb.createPredicate(cb, query, clazz, QueryExpression.Conditional.Operator.AND, queryFilters);
+            Predicate complexConditionalPredicate = pb.createPredicate(cb, query, clazz, QueryExpression.LogicOperator.AND, queryFilters);
             if(complexConditionalPredicate != null) predicates.add(complexConditionalPredicate);
 
             return predicates;
@@ -817,32 +821,32 @@ public interface EntityService<E>
             this.base = base;
         }
 
-        private <T> Predicate createPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Class<T> rootEntity, QueryExpression.Conditional.Operator operator, QueryExpression.Conditional... condFilters)
+        private <T> Predicate createPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Class<T> rootEntity, QueryExpression.LogicOperator logicOperator, QueryExpression.CompoundFilter... condFilters)
         {
             Predicate condPredicate = null;
 
-            for(QueryExpression.Conditional condFilter : ArrayUtils.nullToEmpty(condFilters, QueryExpression.Conditional[].class))
+            for(QueryExpression.CompoundFilter condFilter : ArrayUtils.nullToEmpty(condFilters, QueryExpression.CompoundFilter[].class))
             {
-                QueryExpression.Conditional.Operator condOperator = condFilter.getLogicOperator();
+                QueryExpression.LogicOperator condOperator = condFilter.getLogicOperator();
 
                 Predicate simpleFilters = this.createPredicate(cb, query, rootEntity, condOperator, condFilter.getFilters());
-                Predicate complexSubFilters = this.createPredicate(cb, query, rootEntity, condOperator, condFilter.getConditionals());
+                Predicate complexSubFilters = this.createPredicate(cb, query, rootEntity, condOperator, condFilter.getCompoundFilters());
                 Predicate complexPredicate = PredicateUtil.combinePredicates(cb, simpleFilters, complexSubFilters, condOperator);
 
-                condPredicate = PredicateUtil.combinePredicates(cb, condPredicate, complexPredicate, operator);
+                condPredicate = PredicateUtil.combinePredicates(cb, condPredicate, complexPredicate, logicOperator);
             }
 
             return condPredicate;
         }
 
-        private <T extends Comparable<? super T>> Predicate createPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Class<?> rootEntity, QueryExpression.Conditional.Operator operator, QueryExpression.Filter<?>... filters)
+        private <T extends Comparable<? super T>> Predicate createPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Class<?> rootEntity, QueryExpression.LogicOperator logicOperator, QueryExpression.Filter<?>... filters)
         {
             Predicate filterPredicate = null;
 
             for(QueryExpression.Filter<T> f : ArrayUtils.nullToEmpty(filters, QueryExpression.Filter[].class))
             {
                 Predicate p = this.createPredicate(cb, query, rootEntity, f);
-                filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, p, operator);
+                filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, p, logicOperator);
             }
 
             return filterPredicate;
@@ -858,11 +862,11 @@ public interface EntityService<E>
             //Predicate p = this.createPredicateFromEntityPath(cb, path, filter);
 
             Path<T> fieldPath = null;
-            if(QueryExpression.Filter.subqueryComparators.contains(filter.getCmp()))
+            if(EntityService.subqueryComparators.contains(filter.getCompareOperator()))
             {
                 String filterEntityPath = Helper.getPathWithoutLastItem(filter.getColumnEntityPath().getValue());
                 LinkedList<String> filterEntityPaths = ReflectionHelper.pathToLinkedList(filterEntityPath);
-                if(filterEntityPaths.isEmpty()) throw new RuntimeException(String.format("Root entity fields not allowed with subquery comparators: %s!", QueryExpression.Filter.subqueryComparators.toString()));
+                if(filterEntityPaths.isEmpty()) throw new RuntimeException(String.format("Root entity fields not allowed with subquery comparators: %s!", EntityService.subqueryComparators.toString()));
 
                 //NOTICE: auto-join only until Subquery root entity
                 From<?,?> parentEntityPath = Core.findOrGenerateJoinPath(query.getRoots(), rootEntity, null, filterEntityPaths);
@@ -936,23 +940,23 @@ public interface EntityService<E>
                             //allOtherMappedValues.removeAll(allFilterMappedValues);
                             //T[] allOtherMappedValuesArray = Helper.castValues(filterColumn.getJavaType(), allOtherMappedValues.toArray());
 
-                            //QueryExpression.Filter<T> defaultFilter = new QueryExpression.Filter(filter.getEntity(), filter.getColumnPath(), filter.getCmp(), filter.getMod(), attributeMapper.convertToDatabaseValue(attributeMapper.getDefaultValue()));
+                            //QueryExpression.Filter<T> defaultFilter = new QueryExpression.Filter(filter.getEntity(), filter.getColumnPath(), filter.getCompareOperator(), filter.getValueModifier(), attributeMapper.convertToDatabaseValue(attributeMapper.getDefaultValue()));
                             //if(this.isLoggingEnabled()) logger.info(String.format("Converted value '%s' to value: %s", val, defaultFilter));
-                            QueryExpression.Filter<T> allMappedFilter = new QueryExpression.Filter(filter.getRootEntity(), filter.getColumnEntityPath().getValue(), filter.getCmp(), filter.getMod(), attributeMapper.getAllMappedValues());
+                            QueryExpression.Filter<T> allMappedFilter = new QueryExpression.Filter(filter.getRootEntity(), filter.getColumnEntityPath().getValue(), filter.getCompareOperator(), filter.getValueModifier(), attributeMapper.getAllMappedValues());
                             if(es.isLoggingEnabled()) logger.info(String.format("Converted value '%s' to NOT values: %s", val, allMappedFilter));
 
                             //Predicate pDefault = this.createPredicate(cb, query, filterColumn, defaultFilter);
                             Predicate pNotMapped = this.createPredicate(cb, query, filterColumn, allMappedFilter).not();
                             //Predicate pDefaultOrNotMapped = cb.or(pDefault, pNotMapped);
-                            filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, pNotMapped, QueryExpression.Conditional.Operator.OR);
+                            filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, pNotMapped, QueryExpression.LogicOperator.OR);
                         }
                         else
                         {
-                            QueryExpression.Filter<T> mappedFilter = new QueryExpression.Filter(filter.getRootEntity(), filter.getColumnEntityPath().getValue(), filter.getCmp(), filter.getMod(), attributeMapper.mapToDatabaseValues(val));
+                            QueryExpression.Filter<T> mappedFilter = new QueryExpression.Filter(filter.getRootEntity(), filter.getColumnEntityPath().getValue(), filter.getCompareOperator(), filter.getValueModifier(), attributeMapper.mapToDatabaseValues(val));
                             if(es.isLoggingEnabled()) logger.info(String.format("Converted value '%s' to values: %s", val, mappedFilter));
 
                             Predicate pMapped = this.createPredicate(cb, query, filterColumn, mappedFilter);
-                            filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, pMapped, QueryExpression.Conditional.Operator.OR);
+                            filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, pMapped, QueryExpression.LogicOperator.OR);
                         }
                     }
                 }
@@ -983,22 +987,22 @@ public interface EntityService<E>
             Predicate p = null;
 
             //Parameter<Comparable> columnParameter = cb.parameter(Comparable.class);
-            QueryExpression.Filter.Cmp comparator = filter.getCmp();
+            QueryExpression.CompareOperator comparator = filter.getCompareOperator();
             if(comparator == null) throw new RuntimeException(String.format("Filter (%s) - QueryExpression.Filter.Cmp must NOT be null!", filter.toString()));
 
             Expression<? extends T> cmpFilterColumn = filterColumn;
             Subquery<Long> subquery = null;
 
             //convert filter column to comparison type
-            if(QueryExpression.Filter.booleanComparators.contains(comparator))
+            if(EntityService.booleanComparators.contains(comparator))
             {
                 cmpFilterColumn = (Expression<? extends T>) filterColumn.as(Boolean.class);
             }
-            else if(comparator == QueryExpression.Filter.Cmp.LIKE)
+            else if(comparator == QueryExpression.CompareOperator.LIKE)
             {
                 cmpFilterColumn = (Expression<? extends T>) filterColumn.as(String.class);
             }
-            else if(QueryExpression.Filter.subqueryComparators.contains(comparator))
+            else if(EntityService.subqueryComparators.contains(comparator))
             {
                 //NOTICE: filterColumn is "fictional-query" Path on subqueryComparators types (consistency & value cast/parse purpose only)
                 //NOTICE: filterColumn is replaced with "correct-subquery" Path in generateCountSubquery() method
@@ -1008,9 +1012,9 @@ public interface EntityService<E>
             }
 
             //convert filter values to comparison type
-            if(QueryExpression.Filter.valueComparators.contains(comparator))    //TODO: add subqueryComparators to valueComparators in order to parse values
+            if(EntityService.valueComparators.contains(comparator))    //TODO: add subqueryComparators to valueComparators in order to parse values
             {
-                if(filter.getMod() != null) filter.setValue(EsUtil.getModValues(filter));
+                if(filter.getValueModifier() != null) filter.setValue(EsUtil.getModValues(filter));
 
                 Class<?> cmpFilterType = cmpFilterColumn.getJavaType();
                 //NOTICE: do NOT parse if filter Field is @Convert (parse to existing value type)
@@ -1842,7 +1846,7 @@ public interface EntityService<E>
      */
     public static class PredicateUtil
     {
-        private static Predicate combinePredicates(CriteriaBuilder cb, Predicate pred1, Predicate pred2, QueryExpression.Conditional.Operator operator)
+        private static Predicate combinePredicates(CriteriaBuilder cb, Predicate pred1, Predicate pred2, QueryExpression.LogicOperator logicOperator)
         {
             Predicate predicate = null;
 
@@ -1850,7 +1854,7 @@ public interface EntityService<E>
             else if(pred1 == null && pred2 != null) predicate = pred2;
             else if(pred1 != null && pred2 != null)
             {
-                switch(operator)
+                switch(logicOperator)
                 {
                     case AND:
                     {
@@ -1898,7 +1902,7 @@ public interface EntityService<E>
 
         private static <T extends Comparable<? super T>> T[] getModValues(QueryExpression.Filter<T> filter)
         {
-            switch(filter.getMod())
+            switch(filter.getValueModifier())
             {
                 case NONE: return filter.getValue();
                 case LikeL: return (T[]) Arrays.stream(filter.getValue()).map(v -> "%"+v).toArray(String[]::new);
@@ -1908,7 +1912,7 @@ public interface EntityService<E>
                 case SplitLikeL: return (T[]) Arrays.stream(filter.getValue()).map(v -> String.valueOf(v).trim().split(StringUtils.SPACE)).flatMap(v -> Arrays.stream(v.clone())).map(v -> "%"+v).toArray(String[]::new);
                 case SplitLikeR: return (T[]) Arrays.stream(filter.getValue()).map(v -> String.valueOf(v).trim().split(StringUtils.SPACE)).flatMap(v -> Arrays.stream(v.clone())).map(v -> v+"%").toArray(String[]::new);
                 case SplitLikeLR: return (T[]) Arrays.stream(filter.getValue()).map(v -> String.valueOf(v).trim().split(StringUtils.SPACE)).flatMap(v -> Arrays.stream(v.clone())).map(v -> "%"+v+"%").toArray(String[]::new);
-                default: throw new NotImplementedException(String.format("Missing implementation for Filter modifier: %s", filter.getMod()));
+                default: throw new NotImplementedException(String.format("Missing implementation for Filter modifier: %s", filter.getValueModifier()));
             }
         }
 
