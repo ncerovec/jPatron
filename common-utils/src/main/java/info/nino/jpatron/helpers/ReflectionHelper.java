@@ -33,6 +33,19 @@ public class ReflectionHelper
         return fieldName;
     }
 
+    public static String getPathWithoutLastItem(String fieldPath)
+    {
+        String path = null;
+
+        if(fieldPath != null)
+        {
+            int fieldStartIndex = fieldPath.lastIndexOf(ReflectionHelper.PATH_SEPARATOR);
+            if(fieldStartIndex >= 0) path = fieldPath.substring(0, fieldStartIndex);
+        }
+
+        return path;
+    }
+
     public static LinkedList<String> pathToLinkedList(String path)
     {
         String[] paths = {};
@@ -172,7 +185,7 @@ public class ReflectionHelper
                 //logger.info(String.format("DTO/ENTITY Class resolved from Collection (%s): %s", nextClass.getSimpleName(), field.getType()));
             }
 
-            Map.Entry<Class<?>, String> pathField = ReflectionHelper.resolveEntityClassAndFieldName(clazz, field);
+            Pair<Class<?>, String> pathField = ReflectionHelper.resolveEntityClassAndFieldName(clazz, field);
             prefixPath = (prefixPath != null) ? prefixPath + ReflectionHelper.PATH_SEPARATOR + pathField.getValue() : pathField.getValue();   //current field entity-path
 
             //String remainingPath = String.join(ReflectionHelper.PATH_SEPARATOR, paths);
@@ -207,7 +220,7 @@ public class ReflectionHelper
 
         if(fieldName.contains(ReflectionHelper.PATH_SEPARATOR)) //check if fieldName is path
         {
-            Map.Entry<Class<?>, String> pathField = ReflectionHelper.findEntityFieldByPath(clazz, fieldName,true);
+            Pair<Class<?>, String> pathField = ReflectionHelper.findEntityFieldByPath(clazz, fieldName,true);
             clazz = pathField.getKey();
             fieldName = pathField.getValue();
         }
