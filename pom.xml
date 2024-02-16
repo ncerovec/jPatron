@@ -4,7 +4,7 @@
 
     <groupId>info.nino.jpatron</groupId>
     <artifactId>jpatron</artifactId>
-    <version>X.Y.Z</version>
+    <version>X.Y.Z-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>jPatron - Object-Oriented JPA Data Library</name>
@@ -40,7 +40,7 @@
     </licenses>
 
     <scm>
-        <tag>X.Y.Z</tag>
+        <tag>HEAD</tag>
         <url>https://github.com/ncerovec/jPatron</url>
         <connection>scm:git:git://github.com/ncerovec/jPatron.git</connection>
         <developerConnection>scm:git:https://github.com/ncerovec/jPatron.git</developerConnection>
