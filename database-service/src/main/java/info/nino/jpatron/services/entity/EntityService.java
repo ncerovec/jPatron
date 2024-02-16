@@ -2045,8 +2045,13 @@ public interface EntityService<E>
                 if(Long.class.isAssignableFrom(clazz) || long.class.isAssignableFrom(clazz)) return Long.parseLong(value);
                 if(Float.class.isAssignableFrom(clazz) || float.class.isAssignableFrom(clazz)) return Float.parseFloat(value);
                 if(Double.class.isAssignableFrom(clazz) || double.class.isAssignableFrom(clazz)) return Double.parseDouble(value);
-                if(clazz.isEnum() || Enum.class.isAssignableFrom(clazz)) return Enum.valueOf(clazz, value);
-                //if(clazz.isEnum() || Enum.class.isAssignableFrom(clazz)) return (Comparable) Arrays.stream(clazz.getEnumConstants()).filter(v -> value.equalsIgnoreCase(v.toString())).findAny().orElse(value);
+                //if(clazz.isEnum() || Enum.class.isAssignableFrom(clazz)) return Enum.valueOf(clazz, value);
+                if(clazz.isEnum() || Enum.class.isAssignableFrom(clazz))
+                {
+                    return (Comparable) Arrays.stream(clazz.getEnumConstants())
+                            .filter(e -> ((Enum) e).name().equalsIgnoreCase(value)).findAny()
+                            .orElseGet(() -> Enum.valueOf(clazz, value));
+                }
                 if(Date.class.isAssignableFrom(clazz))
                 {
                     Date dateValue = DateTimeFormatUtil.parseDateTimeISO8601(value);
