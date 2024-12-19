@@ -1,24 +1,20 @@
 package info.nino.jpatron.services.entity;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Sets;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.DateTimeFormatUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
-import info.nino.jpatron.metamodel.PageRequest;
 import info.nino.jpatron.pagination.Page;
-import info.nino.jpatron.request.QueryExpression;
-import info.nino.jpatron.request.QuerySort;
+import info.nino.jpatron.pagination.PageRequest;
 import jakarta.persistence.*;
 import jakarta.persistence.criteria.*;
 import jakarta.persistence.metamodel.Attribute;
 import jakarta.persistence.metamodel.Bindable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.text.WordUtils;
 import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.jpa.HibernateHints;
@@ -49,11 +45,6 @@ public interface EntityService<E>
     Logger logger = Logger.getLogger(EntityService.class.getName());
 
     String LABEL_PATHS_SEPARATOR = ConstantsUtil.COMMA;
-
-    List<QueryExpression.CompareOperator> booleanComparators = Arrays.asList(QueryExpression.CompareOperator.TRUE, QueryExpression.CompareOperator.FALSE);
-    List<QueryExpression.CompareOperator> subqueryComparators = Arrays.asList(QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NotEACH, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.NotEXCEPT);
-    List<QueryExpression.CompareOperator> nonValueComparators = Arrays.asList(QueryExpression.CompareOperator.IsNULL, QueryExpression.CompareOperator.IsNotNULL, QueryExpression.CompareOperator.IsEMPTY, QueryExpression.CompareOperator.IsNotEMPTY);
-    List<QueryExpression.CompareOperator> valueComparators = Arrays.asList(QueryExpression.CompareOperator.EQ, QueryExpression.CompareOperator.NEQ, QueryExpression.CompareOperator.LIKE, QueryExpression.CompareOperator.GT, QueryExpression.CompareOperator.LT, QueryExpression.CompareOperator.GToE, QueryExpression.CompareOperator.LToE, QueryExpression.CompareOperator.IN, QueryExpression.CompareOperator.NotIN, QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NotEACH, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.NotEXCEPT);
 
     //@PersistenceContext(unitName = "primary")
     //EntityManager em = null;
@@ -153,7 +144,7 @@ public interface EntityService<E>
             List<Predicate> newPredicates = this.getQueryBuilderInstance().getFilters(cb, query, entity, request.getQueryFilters());
             for(Predicate p : newPredicates)
             {
-                queryPredicate = PredicateUtil.combinePredicates(cb, queryPredicate, p, QueryExpression.LogicOperator.AND);
+                queryPredicate = PredicateUtil.combinePredicates(cb, queryPredicate, p, QueryExpression.Conditional.Operator.AND);
             }
 
             if(queryPredicate != null)
@@ -184,7 +175,7 @@ public interface EntityService<E>
             List<Predicate> newPredicates = this.getQueryBuilderInstance().getFilters(cb, query, entity, request.getQueryFilters());
             for(Predicate p : newPredicates)
             {
-                queryPredicate = PredicateUtil.combinePredicates(cb, queryPredicate, p, QueryExpression.LogicOperator.AND);
+                queryPredicate = PredicateUtil.combinePredicates(cb, queryPredicate, p, QueryExpression.Conditional.Operator.AND);
             }
 
             if(queryPredicate != null)
@@ -328,7 +319,7 @@ public interface EntityService<E>
 
         private Long countQuery(EntityManager em, CriteriaQuery<?> criteria, Class<E> clazz)
         {
-            Stream<Tuple> countTuples = this.aggQuery(em, criteria, clazz, new QueryExpression(clazz));
+            Stream<Tuple> countTuples = this.aggQuery(em, criteria, clazz, new QueryExpression(null));
 
             List<Tuple> countTuple = countTuples.collect(Collectors.toList());
             if(countTuple.size() != 1)
@@ -344,7 +335,7 @@ public interface EntityService<E>
             CriteriaBuilder cb = em.getCriteriaBuilder();
             CriteriaQuery<E> query = Core.createEntityQuery(cb, entity);
             //CriteriaQuery<Tuple> query = this.createTupleQuery(cb, entity);
-            Root<? extends E> root = Core.findEntityRootPath(query.getRoots(), entity);
+            Root<E> root = Core.findEntityRootPath(query.getRoots(), entity);
             if(root == null) throw new RuntimeException(String.format("DataQuery - RootPath NOT FOUND for ENTITY Class: %s!", entity.getSimpleName()));
 
             if(request.getQueryFilters() != null)
@@ -444,25 +435,26 @@ public interface EntityService<E>
             CriteriaBuilder cb = em.getCriteriaBuilder();
             CriteriaQuery<Tuple> aggQuery = Core.replicateTupleQuery(cb, query);
 
+            //TODO: check if any operations with non-number columns
+            Path<? extends Number> valueColumn = Core.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, metaVQ.getValueColumnPath());
+            //Path<?> labelColumn = this.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, metaVQ.getEntity(), metaVQ.getLabelColumnPath());
+
             Path[] labelColumns = null;
-            Expression<?>[] selectColumns = null;
-            if(metaVQ.getValueColumnEntityPath() != null)
+            Expression<String> labelColumn = null;
+            if(StringUtils.isNotBlank(metaVQ.getLabelColumnPath()))
             {
-                //TODO: check if any operations with non-number columns
-                Path<? extends Number> valueColumn = Core.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, metaVQ.getValueColumnEntityPath());
-                //Path<?> labelColumn = this.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, metaVQ.getEntity(), metaVQ.getLabelColumnPath());
+                String[] labelColumnsPaths = metaVQ.getLabelColumnPath().split(EntityService.LABEL_PATHS_SEPARATOR);
+                labelColumns = Arrays.stream(labelColumnsPaths).map(l -> Core.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, l.trim())).toArray(Path[]::new);
+                //labelColumn = Arrays.stream(labelColumns).map(l -> (Expression<String>) l).reduce(cb::concat).orElse(null);
+                //.reduce(cb.literal(StringUtils.EMPTY),                                      //identity
+                //(concat, nextLabel) -> cb.concat(concat, (Expression<String>) nextLabel),   //accumulator
+                //(concat, nextLabel) -> cb.concat(concat, nextLabel));                       //combiner
+            }
 
-                if(metaVQ.getLabelColumnEntityPath() != null)
-                {
-                    String[] labelColumnsPaths = metaVQ.getLabelColumnEntityPath().getValue().split(EntityService.LABEL_PATHS_SEPARATOR);
-                    labelColumns = Arrays.stream(labelColumnsPaths).map(l -> Core.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, new ImmutablePair<>(metaVQ.getLabelColumnEntityPath().getKey(), l.trim()))).toArray(Path[]::new);
-                    //labelColumn = Arrays.stream(labelColumns).map(l -> (Expression<String>) l).reduce(cb::concat).orElse(null);
-                    //.reduce(cb.literal(StringUtils.EMPTY),                                      //identity
-                    //(concat, nextLabel) -> cb.concat(concat, (Expression<String>) nextLabel),   //accumulator
-                    //(concat, nextLabel) -> cb.concat(concat, nextLabel));                       //combiner
-                }
-
-                QueryExpression.Function function = metaVQ.getFunc();
+            Expression<?>[] selectColumns = null;
+            if(valueColumn != null)
+            {
+                QueryExpression.Func function = metaVQ.getFunc();
                 if(function == null) throw new RuntimeException(String.format("AggQuery (%s) - QueryExpression.Func must NOT be null!", EsUtil.getMetaValueKey(metaVQ)));
                 switch(function)
                 {
@@ -511,10 +503,9 @@ public interface EntityService<E>
             }
             else    //entity-count
             {
-                //String joinPathString = Helper.getPathWithoutLastItem(metaVQ.getValueColumnEntityPath().getValue());
-                //Path<?> path = Core.findFromPath(aggQuery.getRoots(), metaVQ.getValueColumnEntityPath().getKey(), joinPathString);
-                Path<?> path = Core.findEntityRootPath(aggQuery.getRoots(), metaVQ.getRootEntity());
-                if(path == null) throw new RuntimeException(String.format("AggQuery - Path NOT FOUND for ENTITY Class: %s!", metaVQ.getRootEntity()));
+                String joinPathString = Helper.getPathWithoutLastItem(metaVQ.getValueColumnPath());
+                Path<?> path = Core.findFromPath(aggQuery.getRoots(), joinPathString);
+                if(path == null) throw new RuntimeException(String.format("AggQuery - Path NOT FOUND for current Class: %s!", clazz.getSimpleName()));
                 selectColumns = new Expression[] { cb.countDistinct(path) };
             }
 
@@ -525,8 +516,8 @@ public interface EntityService<E>
             Predicate orgPredicate = aggQuery.getRestriction();
             if(ArrayUtils.isNotEmpty(metaVQ.getFilters()))
             {
-                Predicate p = pb.createPredicate(cb, aggQuery, clazz, QueryExpression.LogicOperator.AND, metaVQ.getFilters());
-                orgPredicate = PredicateUtil.combinePredicates(cb, orgPredicate, p, QueryExpression.LogicOperator.AND);
+                Predicate p = pb.createPredicate(cb, aggQuery, clazz, QueryExpression.Conditional.Operator.AND, metaVQ.getFilters());
+                orgPredicate = PredicateUtil.combinePredicates(cb, orgPredicate, p, QueryExpression.Conditional.Operator.AND);
             }
 
             if(orgPredicate != null)
@@ -561,17 +552,10 @@ public interface EntityService<E>
             //Path<?> path = Core.findFromPath(distinctQuery.getRoots(), metaVQ.getEntity());
             //if(path == null) throw new RuntimeException(String.format("DistinctQuery - Path NOT FOUND for ENTITY Class: %s!", metaVQ.getEntity().getSimpleName()));
 
-            Expression<?>[] selectColumns = null;
-            Path<?> valueColumn = Core.findOrGenerateFieldJoinPath(distQuery.getRoots(), clazz, metaVQ.getValueColumnEntityPath());
-            if(metaVQ.getLabelColumnEntityPath() != null)
-            {
-                Path<?> labelColumn = Core.findOrGenerateFieldJoinPath(distQuery.getRoots(), clazz, metaVQ.getLabelColumnEntityPath());
-                selectColumns = new Expression[] { valueColumn, labelColumn };
-            }
-            else
-            {
-                selectColumns = new Expression[] { valueColumn };
-            }
+            Path<?> valueColumn = Core.findOrGenerateFieldJoinPath(distQuery.getRoots(), clazz, metaVQ.getValueColumnPath());
+            Path<?> labelColumn = Core.findOrGenerateFieldJoinPath(distQuery.getRoots(), clazz, metaVQ.getLabelColumnPath());
+
+            Expression<?>[] selectColumns = (labelColumn != null) ? new Expression[] { valueColumn, labelColumn } : new Expression[] { valueColumn };
 
             distQuery.select(cb.tuple(selectColumns));
             distQuery.distinct(true);
@@ -580,8 +564,8 @@ public interface EntityService<E>
             Predicate orgPredicate = distQuery.getRestriction();
             if(ArrayUtils.isNotEmpty(metaVQ.getFilters()))
             {
-                Predicate p = pb.createPredicate(cb, distQuery, clazz, QueryExpression.LogicOperator.AND, metaVQ.getFilters());
-                orgPredicate = PredicateUtil.combinePredicates(cb, orgPredicate, p, QueryExpression.LogicOperator.AND);
+                Predicate p = pb.createPredicate(cb, distQuery, clazz, QueryExpression.Conditional.Operator.AND, metaVQ.getFilters());
+                orgPredicate = PredicateUtil.combinePredicates(cb, orgPredicate, p, QueryExpression.Conditional.Operator.AND);
             }
 
             if(orgPredicate != null)
@@ -603,13 +587,13 @@ public interface EntityService<E>
             return distinctResult;
         }
 
-        private <E> List<Order> getSorting(CriteriaBuilder cb, CriteriaQuery<?> query, Class<E> clazz, Set<QuerySort> sorts)
+        private <E> List<Order> getSorting(CriteriaBuilder cb, CriteriaQuery<?> query, Class<E> clazz, Set<PageRequest.Sort> sorts)
         {
             return sorts.stream()
                     .map(s ->
                     {
                         //Expression<?> sortColumn = Core.generateFieldPath(query.getRoots(), clazz, s.getColumnPath());
-                        Expression<?> sortColumn = Core.findOrGenerateFieldJoinPath(query.getRoots(), clazz, s.getColumnEntityPath());
+                        Expression<?> sortColumn = Core.findOrGenerateFieldJoinPath(query.getRoots(), clazz, s.getColumnPath());
                         if(s.getSortType() != null) sortColumn = sortColumn.as(s.getSortType());
 
                         switch(s.getDirection())
@@ -627,11 +611,9 @@ public interface EntityService<E>
         {
             for(String fetchEntityPath : fetchEntityPaths)
             {
-                Map.Entry<Class<?>, String> entityField = ReflectionHelper.findEntityFieldByPath(entity, fetchEntityPath, true);
-
-                Class<?> parentEntity = entityField.getKey();
-                From<?,?> parentPath = Core.findOrGenerateJoinPath(query.getRoots(), entity, new ImmutablePair<>(parentEntity, fetchEntityPath));
-                Core.addLeftFetch(parentPath, ReflectionHelper.getFieldNameFromPath(fetchEntityPath));
+                LinkedList<String> entityPaths = ReflectionHelper.pathToLinkedList(fetchEntityPath);
+                From<?,?> parentPath = Core.findOrGenerateJoinPath(query.getRoots(), entity, entityPaths);
+                Core.addLeftFetch(parentPath, entityPaths.getLast());
             }
         }
 
@@ -684,24 +666,24 @@ public interface EntityService<E>
             return entityGraphHint;
         }
 
-        private void extendEntityGraphBySortEntities(PageRequest<E> request)
+        private void extendEntityGraphBySortEntities(PageRequest request)
         {
             List<String> entityGraphPaths = new ArrayList<>(Arrays.asList(ArrayUtils.nullToEmpty(request.getEntityGraphPaths())));
 
-            for(QuerySort sort : CollectionUtils.emptyIfNull(request.getSorts()))
+            for(PageRequest.Sort sort : CollectionUtils.emptyIfNull(request.getSorts()))
             {
-                String sortEntityPath = ReflectionHelper.getPathWithoutLastItem(sort.getColumnEntityPath().getValue());
+                String sortEntityPath = Helper.getPathWithoutLastItem(sort.getColumnPath());
                 if(StringUtils.isNotBlank(sortEntityPath) && !entityGraphPaths.contains(sortEntityPath)) entityGraphPaths.add(sortEntityPath);
             }
 
             if(CollectionUtils.isNotEmpty(entityGraphPaths)) request.setEntityGraphPaths(entityGraphPaths.toArray(new String[]{}));
         }
 
-        private List<Predicate> getFilters(CriteriaBuilder cb, CriteriaQuery<?> query, Class<E> clazz, QueryExpression.CompoundFilter queryFilters)
+        private List<Predicate> getFilters(CriteriaBuilder cb, CriteriaQuery<?> query, Class<E> clazz, QueryExpression.Conditional queryFilters)
         {
             List<Predicate> predicates = new ArrayList<>();
 
-            Predicate complexConditionalPredicate = pb.createPredicate(cb, query, clazz, QueryExpression.LogicOperator.AND, queryFilters);
+            Predicate complexConditionalPredicate = pb.createPredicate(cb, query, clazz, QueryExpression.Conditional.Operator.AND, queryFilters);
             if(complexConditionalPredicate != null) predicates.add(complexConditionalPredicate);
 
             return predicates;
@@ -754,10 +736,10 @@ public interface EntityService<E>
 
                 Map<Object, Object> aggValues = columnAggs.map(a ->
                 {
-                    int labelStartIndex = (agg.getFunc() == QueryExpression.Function.AVG) ? 2 : 1;
+                    int labelStartIndex = (agg.getFunc() == QueryExpression.Func.AVG) ? 2 : 1;
                     String labelsConcat = (a.getElements().size() > labelStartIndex) ? a.getElements().subList(labelStartIndex, a.getElements().size()).stream().map(te -> String.valueOf(a.get(te))).collect(Collectors.joining()) : "value";
 
-                    Number valueCount = (agg.getFunc() == QueryExpression.Function.AVG) ? (Number) a.get(1) : 1;
+                    Number valueCount = (agg.getFunc() == QueryExpression.Func.AVG) ? (Number) a.get(1) : 1;
                     return new AbstractMap.SimpleEntry<String, Map.Entry<Number, Number>>(labelsConcat, new AbstractMap.SimpleEntry<>((Number) a.get(0), valueCount));
                 })
                 .filter(av -> av.getValue().getKey() != null && av.getValue().getValue() != null)
@@ -821,34 +803,32 @@ public interface EntityService<E>
             this.base = base;
         }
 
-        private <T> Predicate createPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Class<T> rootEntity, QueryExpression.LogicOperator logicOperator, QueryExpression.CompoundFilter... condFilters)
+        private <T> Predicate createPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Class<T> rootEntity, QueryExpression.Conditional.Operator operator, QueryExpression.Conditional... condFilters)
         {
             Predicate condPredicate = null;
 
-            for(QueryExpression.CompoundFilter condFilter : ArrayUtils.nullToEmpty(condFilters, QueryExpression.CompoundFilter[].class))
+            for(QueryExpression.Conditional condFilter : condFilters)
             {
-                QueryExpression.LogicOperator condOperator = condFilter.getLogicOperator();
+                QueryExpression.Conditional.Operator condOperator = condFilter.getLogicOperator();
 
-                QueryExpression.Filter<?>[] simpleFilterArray = (condFilter.getFilters() != null) ? condFilter.getFilters().toArray(new QueryExpression.Filter[0]) : null;
-                Predicate simpleFilters = this.createPredicate(cb, query, rootEntity, condOperator, simpleFilterArray);
-                QueryExpression.CompoundFilter[] complexFilterArray = (condFilter.getCompoundFilters() != null) ? condFilter.getCompoundFilters().toArray(new QueryExpression.CompoundFilter[0]) : null;
-                Predicate complexSubFilters = this.createPredicate(cb, query, rootEntity, condOperator, complexFilterArray);
+                Predicate simpleFilters = this.createPredicate(cb, query, rootEntity, condOperator, condFilter.getFilters().toArray(new QueryExpression.Filter[]{}));
+                Predicate complexSubFilters = this.createPredicate(cb, query, rootEntity, condOperator, condFilter.getConditionals().toArray(new QueryExpression.Conditional[]{}));
                 Predicate complexPredicate = PredicateUtil.combinePredicates(cb, simpleFilters, complexSubFilters, condOperator);
 
-                condPredicate = PredicateUtil.combinePredicates(cb, condPredicate, complexPredicate, logicOperator);
+                condPredicate = PredicateUtil.combinePredicates(cb, condPredicate, complexPredicate, operator);
             }
 
             return condPredicate;
         }
 
-        private <T extends Comparable<? super T>> Predicate createPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Class<?> rootEntity, QueryExpression.LogicOperator logicOperator, QueryExpression.Filter<?>... filters)
+        private <T extends Comparable<? super T>> Predicate createPredicate(CriteriaBuilder cb, CriteriaQuery<?> query, Class<?> rootEntity, QueryExpression.Conditional.Operator operator, QueryExpression.Filter<?>... filters)
         {
             Predicate filterPredicate = null;
 
-            for(QueryExpression.Filter<T> f : ArrayUtils.nullToEmpty(filters, QueryExpression.Filter[].class))
+            for(QueryExpression.Filter f : filters)
             {
                 Predicate p = this.createPredicate(cb, query, rootEntity, f);
-                filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, p, logicOperator);
+                filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, p, operator);
             }
 
             return filterPredicate;
@@ -864,21 +844,20 @@ public interface EntityService<E>
             //Predicate p = this.createPredicateFromEntityPath(cb, path, filter);
 
             Path<T> fieldPath = null;
-            if(EntityService.subqueryComparators.contains(filter.getCompareOperator()))
+            if(QueryExpression.Filter.subqueryComparators.contains(filter.getCmp()))
             {
-                String filterEntityPath = ReflectionHelper.getPathWithoutLastItem(filter.getColumnEntityPath().getValue());
-                //LinkedList<String> filterEntityPaths = ReflectionHelper.pathToLinkedList(filterEntityPath);
-                if(filterEntityPath.isEmpty()) throw new RuntimeException(String.format("Root entity fields not allowed with subquery comparators: %s!", EntityService.subqueryComparators.toString()));
+                String filterEntityPath = Helper.getPathWithoutLastItem(filter.getColumnPath());
+                LinkedList<String> filterEntityPaths = ReflectionHelper.pathToLinkedList(filterEntityPath);
+                if(filterEntityPaths.isEmpty()) throw new RuntimeException(String.format("Root entity fields not allowed with subquery comparators: %s!", QueryExpression.Filter.subqueryComparators.toString()));
 
                 //NOTICE: auto-join only until Subquery root entity
-                Pair<Class<?>, String> parentEntityFieldPath = ReflectionHelper.findEntityFieldByPath(rootEntity, filterEntityPath, true);
-                From<?,?> parentEntityPath = Core.findOrGenerateJoinPath(query.getRoots(), rootEntity, parentEntityFieldPath);
+                From<?,?> parentEntityPath = Core.findOrGenerateJoinPath(query.getRoots(), rootEntity, filterEntityPaths);
 
                 CriteriaQuery<?> fictionalQuery = cb.createQuery(parentEntityPath.getJavaType()); //query.subquery(parentEntityPath.getJavaType());
                 Root<?> filterEntityParentRoot = fictionalQuery.from(parentEntityPath.getJavaType());
                 Path<?> filterEntityJoinPath = filterEntityParentRoot.join(ReflectionHelper.getFieldNameFromPath(filterEntityPath));
 
-                String columnName = ReflectionHelper.getFieldNameFromPath(filter.getColumnEntityPath().getValue());
+                String columnName = ReflectionHelper.getFieldNameFromPath(filter.getColumnPath());
                 fieldPath = filterEntityJoinPath.get(columnName); //NOTICE: "fictional" fieldPath
 
                 //String filterEntityField = ReflectionHelper.getFieldNameFromPath(filterEntityPath);
@@ -890,7 +869,7 @@ public interface EntityService<E>
             else
             {
                 //fieldPath = Core.generateFieldPath(query.getRoots(), rootEntity, filter.getColumnPath());                                 //field-path with auto cross-join
-                fieldPath = Core.findOrGenerateFieldJoinPath(cb, query, rootEntity, filter.getColumnEntityPath());                          //field-path with left-joins (cross-join allowed)
+                fieldPath = Core.findOrGenerateFieldJoinPath(cb, query, rootEntity, filter.getColumnPath());                                //field-path with left-joins (cross-join allowed)
                 //fieldPath = Core.findOrGenerateFieldJoinPath(query.getRoots(), rootEntity, filter.getEntity(), filter.getColumnPath());   //field-path with left-joins (cross-join not allowed)
             }
 
@@ -914,7 +893,7 @@ public interface EntityService<E>
             Predicate filterPredicate = null;
 
             //AbstractPathImpl.class replaced with AbstractSqmSimplePath.class (since Hibernate 6.2.4.Final or earlier)
-            String fieldName = (AbstractSqmSimplePath.class.isAssignableFrom(filterColumn.getClass())) ? ((AbstractSqmSimplePath) filterColumn).getReferencedPathSource().getPathName() : ReflectionHelper.getFieldNameFromPath(filter.getColumnEntityPath().getValue());
+            String fieldName = (AbstractSqmSimplePath.class.isAssignableFrom(filterColumn.getClass())) ? ((AbstractSqmSimplePath) filterColumn).getReferencedPathSource().getPathName() : ReflectionHelper.getFieldNameFromPath(filter.getColumnPath());
 
             Optional<Field> fieldOptional = ReflectionHelper.findModelField(filterColumn.getParentPath().getJavaType(), fieldName);
             if(!fieldOptional.isPresent()) throw new RuntimeException(String.format("Field '%s' NOT FOUND in ENTITY Class: %s!", fieldName, filterColumn.getParentPath().getJavaType().getSimpleName()));
@@ -943,23 +922,23 @@ public interface EntityService<E>
                             //allOtherMappedValues.removeAll(allFilterMappedValues);
                             //T[] allOtherMappedValuesArray = Helper.castValues(filterColumn.getJavaType(), allOtherMappedValues.toArray());
 
-                            //QueryExpression.Filter<T> defaultFilter = new QueryExpression.Filter(filter.getEntity(), filter.getColumnPath(), filter.getCompareOperator(), filter.getValueModifier(), attributeMapper.convertToDatabaseValue(attributeMapper.getDefaultValue()));
+                            //QueryExpression.Filter<T> defaultFilter = new QueryExpression.Filter(filter.getEntity(), filter.getColumnPath(), filter.getCmp(), filter.getMod(), attributeMapper.convertToDatabaseValue(attributeMapper.getDefaultValue()));
                             //if(this.isLoggingEnabled()) logger.info(String.format("Converted value '%s' to value: %s", val, defaultFilter));
-                            QueryExpression.Filter<T> allMappedFilter = new QueryExpression.Filter(filter.getRootEntity(), filter.getColumnEntityPath().getValue(), filter.getCompareOperator(), filter.getValueModifier(), attributeMapper.getAllMappedValues());
+                            QueryExpression.Filter<T> allMappedFilter = new QueryExpression.Filter(filter.getColumnPath(), filter.getCmp(), filter.getMod(), attributeMapper.getAllMappedValues());
                             if(es.isLoggingEnabled()) logger.info(String.format("Converted value '%s' to NOT values: %s", val, allMappedFilter));
 
                             //Predicate pDefault = this.createPredicate(cb, query, filterColumn, defaultFilter);
                             Predicate pNotMapped = this.createPredicate(cb, query, filterColumn, allMappedFilter).not();
                             //Predicate pDefaultOrNotMapped = cb.or(pDefault, pNotMapped);
-                            filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, pNotMapped, QueryExpression.LogicOperator.OR);
+                            filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, pNotMapped, QueryExpression.Conditional.Operator.OR);
                         }
                         else
                         {
-                            QueryExpression.Filter<T> mappedFilter = new QueryExpression.Filter(filter.getRootEntity(), filter.getColumnEntityPath().getValue(), filter.getCompareOperator(), filter.getValueModifier(), attributeMapper.mapToDatabaseValues(val));
+                            QueryExpression.Filter<T> mappedFilter = new QueryExpression.Filter(filter.getColumnPath(), filter.getCmp(), filter.getMod(), attributeMapper.mapToDatabaseValues(val));
                             if(es.isLoggingEnabled()) logger.info(String.format("Converted value '%s' to values: %s", val, mappedFilter));
 
                             Predicate pMapped = this.createPredicate(cb, query, filterColumn, mappedFilter);
-                            filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, pMapped, QueryExpression.LogicOperator.OR);
+                            filterPredicate = PredicateUtil.combinePredicates(cb, filterPredicate, pMapped, QueryExpression.Conditional.Operator.OR);
                         }
                     }
                 }
@@ -979,7 +958,7 @@ public interface EntityService<E>
 
         private <T extends Comparable<? super T>> Predicate createPredicateFromEntityPath(CriteriaBuilder cb, CriteriaQuery<?> query, Path<?> entityPath, QueryExpression.Filter<T> filter)
         {
-            String columnName = ReflectionHelper.getFieldNameFromPath(filter.getColumnEntityPath().getValue());
+            String columnName = ReflectionHelper.getFieldNameFromPath(filter.getColumnPath());
             Path<? extends T> filterColumn = entityPath.get(columnName);
 
             return this.createPredicate(cb, query, filterColumn, filter);
@@ -990,22 +969,22 @@ public interface EntityService<E>
             Predicate p = null;
 
             //Parameter<Comparable> columnParameter = cb.parameter(Comparable.class);
-            QueryExpression.CompareOperator comparator = filter.getCompareOperator();
+            QueryExpression.Filter.Cmp comparator = filter.getCmp();
             if(comparator == null) throw new RuntimeException(String.format("Filter (%s) - QueryExpression.Filter.Cmp must NOT be null!", filter.toString()));
 
             Expression<? extends T> cmpFilterColumn = filterColumn;
             Subquery<Long> subquery = null;
 
             //convert filter column to comparison type
-            if(EntityService.booleanComparators.contains(comparator))
+            if(QueryExpression.Filter.booleanComparators.contains(comparator))
             {
                 cmpFilterColumn = (Expression<? extends T>) filterColumn.as(Boolean.class);
             }
-            else if(comparator == QueryExpression.CompareOperator.LIKE)
+            else if(comparator == QueryExpression.Filter.Cmp.LIKE)
             {
                 cmpFilterColumn = (Expression<? extends T>) filterColumn.as(String.class);
             }
-            else if(EntityService.subqueryComparators.contains(comparator))
+            else if(QueryExpression.Filter.subqueryComparators.contains(comparator))
             {
                 //NOTICE: filterColumn is "fictional-query" Path on subqueryComparators types (consistency & value cast/parse purpose only)
                 //NOTICE: filterColumn is replaced with "correct-subquery" Path in generateCountSubquery() method
@@ -1015,9 +994,9 @@ public interface EntityService<E>
             }
 
             //convert filter values to comparison type
-            if(EntityService.valueComparators.contains(comparator))    //TODO: add subqueryComparators to valueComparators in order to parse values
+            if(QueryExpression.Filter.valueComparators.contains(comparator))    //TODO: add subqueryComparators to valueComparators in order to parse values
             {
-                if(filter.getValueModifier() != null) filter.setValue(EsUtil.getModValues(filter));
+                if(filter.getMod() != null) filter.setValue(EsUtil.getModValues(filter));
 
                 Class<?> cmpFilterType = cmpFilterColumn.getJavaType();
                 //NOTICE: do NOT parse if filter Field is @Convert (parse to existing value type)
@@ -1266,37 +1245,19 @@ public interface EntityService<E>
 
         private <T extends Comparable<? super T>> Map.Entry<Subquery<Long>, Path<? extends T>> generateCountSubquery(CriteriaBuilder cb, CriteriaQuery<?> query, Path<? extends T> filterColumn, QueryExpression.Filter<T> filter)
         {
-            //Root root = Core.findRootPath(query.getRoots(), this.getEntityClass());
-            //Path<?> parentFilterPath = filterColumn.getParentPath();
-            //Path<?> grandparentFilterPath = parentFilterPath.getParentPath();
+            String filterEntityPath = Helper.getPathWithoutLastItem(filter.getColumnPath());
+            String filterEntityParentPath = Helper.getPathWithoutLastItem(filterEntityPath);
 
-            String filterEntityPath = ReflectionHelper.getPathWithoutLastItem(filter.getColumnEntityPath().getValue());
-            String filterEntityParentPath = ReflectionHelper.getPathWithoutLastItem(filterEntityPath);
-            Class<?> filterEntityParentType = es.getEntityClass(); //grandparentFilterPath.getJavaType();
-            if(filterEntityParentPath != null)
-            {
-                Optional<Field> filterEntityParentField = ReflectionHelper.findFieldByPath(filterEntityParentType, filterEntityParentPath);
-
-                if(filterEntityParentField.isPresent()) filterEntityParentType = filterEntityParentField.get().getType();
-                else throw new RuntimeException(String.format("FilterEntityParentField '%s' NOT FOUND in Parent ENTITY Class: %s!", filterEntityParentPath, query.getResultType().getSimpleName()));
-            }
-
-            Path<?> grandparentFilterPath = Core.findFromPath(query.getRoots(), filterEntityParentType, filterEntityParentPath);
+            Path<?> grandparentFilterPath = Core.findFromPath(query.getRoots(), filterEntityParentPath);
             Class<?> joinEntity = grandparentFilterPath.getJavaType();
-            String joinColumnName = ReflectionHelper.getFieldNameFromPath(ReflectionHelper.getPathWithoutLastItem(filter.getColumnEntityPath().getValue()));
-
-            //NOTICE: case when filterColumn is grandparentPath of filter column
-            //Path<?> grandparentFilterPath = filterColumn;
-            //Class<?> joinEntity = filterColumn.getJavaType();
-            //String filterEntityParentPath = EntityService.getPathWithoutLastItem(filter.getColumnPath());
-            //String joinColumnName = ReflectionHelper.getFieldNameFromPath(filterEntityParentPath);
+            String joinColumnName = ReflectionHelper.getFieldNameFromPath(Helper.getPathWithoutLastItem(filter.getColumnPath()));
 
             Subquery<Long> subquery = query.subquery(Long.class);
             //Subquery<?> subquery = query.subquery(filterColumn.getJavaType());
             Root<?> filterEntityParentRoot = subquery.from(joinEntity);
             Path<?> filterEntityJoinPath = filterEntityParentRoot.join(joinColumnName);
 
-            String columnName = ReflectionHelper.getFieldNameFromPath(filter.getColumnEntityPath().getValue());
+            String columnName = ReflectionHelper.getFieldNameFromPath(filter.getColumnPath());
             filterColumn = filterEntityJoinPath.get(columnName); //NOTICE: replace "fictional" fieldPath with subquery filter-column Path
 
             Predicate queryJoinRestriction = cb.equal(filterEntityParentRoot, grandparentFilterPath);
@@ -1520,15 +1481,17 @@ public interface EntityService<E>
             return fetch;
         }
 
-        private static <T> Join<?, T> generateJoinPath(From<?, ?> parentPath, Class<? extends T> childEntity, LinkedList<String> fieldJoinPaths)
+        private static <T> Join<?, T> generateJoinPath(From<?, ?> parentPath, LinkedList<String> fieldJoinPaths)
         {
             Join<?, T> childPath = null;
 
             String joinField = fieldJoinPaths.removeFirst();
             Class<?> parentEntity = parentPath.getJavaType();
             Optional<Field> fieldOptional = ReflectionHelper.findModelField(parentEntity, joinField);
-            if(!fieldOptional.isPresent()) throw new RuntimeException(String.format("JoinField '%s' (%s) NOT FOUND in Parent ENTITY Class: %s!", joinField, childEntity.getSimpleName(), parentEntity.getSimpleName()));
-            //else logger.info(String.format("JoinField '%s' (%s) FOUND in Parent ENTITY Class: %s!", joinField, fieldOptional.get().getType().getSimpleName(), parentEntity.getSimpleName()));
+            if(fieldOptional.isEmpty())
+            {
+                throw new RuntimeException(String.format("JoinField with path '%s' NOT FOUND in Parent ENTITY Class: %s!", fieldJoinPaths, parentEntity.getSimpleName()));
+            }
 
             Field field = fieldOptional.get();
             if(fieldJoinPaths.size() > 1)   //RECURSIVE-JOIN until ONLY Field name left in fieldJoinPaths
@@ -1544,7 +1507,7 @@ public interface EntityService<E>
                 */
 
                 Join<?,?> newRoot = Core.addLeftJoin(parentPath, field.getName());
-                childPath = Core.generateJoinPath(newRoot, childEntity, fieldJoinPaths);
+                childPath = Core.generateJoinPath(newRoot, fieldJoinPaths);
             }
             else if(fieldJoinPaths.size() == 1)
             {
@@ -1552,59 +1515,44 @@ public interface EntityService<E>
             }
             else
             {
-                throw new RuntimeException(String.format("JoinPath NOT RESOLVED for Child ENTITY Class: %s!", childEntity.getSimpleName()));
+                throw new RuntimeException(String.format("JoinPath NOT RESOLVED for join-path  Child ENTITY Class: %s!", parentEntity.getSimpleName()));
             }
 
             return childPath;
         }
 
-        private static <T> From<?, T> findOrGenerateJoinPath(Set<? extends From<?, ?>> roots, Class<?> parentEntity, Pair<Class<? extends T>, String> fieldPath)
+        private static <T> From<?, T> findOrGenerateJoinPath(Set<? extends From<?, ?>> roots, Class<?> parentEntity, LinkedList<String> fieldJoinPaths)
         {
-            Class<? extends T> childEntity = fieldPath.getKey();
-            String fieldJoinPath = fieldPath.getValue();
+            if(CollectionUtils.isEmpty(fieldJoinPaths))
+            {
+                throw new IllegalStateException(String.format("FieldJoinPath EMPTY for Parent ENTITY Class (%s)!", parentEntity.getSimpleName()));
+            }
 
-            if(fieldJoinPath.isEmpty()) throw new RuntimeException(String.format("FieldJoinPath EMPTY for Child ENTITY Class (%s) in Parent ENTITY Class (%s)!", Optional.ofNullable(childEntity).map(Class::getSimpleName).orElse(null), parentEntity.getSimpleName()));
+            //TODO: remove childEntity completely (not needed since auto-joins & field-paths)
+            //NOTICE: use NULL as childEntity Class parameter if field Entity is UNKNOWN (resolved from fieldPath)
+            //String fieldPath = String.join(ReflectionHelper.PATH_SEPARATOR, fieldJoinPaths);
+            //Map.Entry<Class<?>, String> field = ReflectionHelper.findEntityFieldByPath(parentEntity, fieldPath, true);
+            //Class<T> childEntity = (Class<T>) field.getKey();
 
-            String joinPath = ReflectionHelper.getPathWithoutLastItem(fieldJoinPath);
-            From<?,T> childPath = Core.findFromPath(roots, childEntity, joinPath);
+            String fieldPath = String.join(ReflectionHelper.PATH_SEPARATOR, fieldJoinPaths);
+            String joinPath = Helper.getPathWithoutLastItem(fieldPath);
+            From<?,T> childPath = Core.findFromPath(roots, joinPath);
             if(childPath == null)
             {
-                LinkedList<String> fieldJoinPaths = ReflectionHelper.pathToLinkedList(fieldJoinPath);
                 if(fieldJoinPaths.size() <= 1)
                 {
-                    throw new RuntimeException(String.format("JoinPath could NOT be found for Child ENTITY Class: %s!", childEntity.getSimpleName()));
+                    throw new IllegalStateException(String.format("FieldJoinPath for path '%s' NOT FOUND in Parent ENTITY Class: %s!", fieldPath, parentEntity.getSimpleName()));
                 }
 
                 From<?,?> parentPath = null;
-                do  //find the closest possible (already joined) parent Path
+                do
                 {
-                    //Class<?> joinedEntity = parentEntity;
-                    Map.Entry<Class<?>, String> entityClassField = ReflectionHelper.findEntityFieldByPath(parentEntity, joinPath, true);
-                    Class<?> joinedEntity = entityClassField.getKey();
-                    joinPath = ReflectionHelper.getPathWithoutLastItem(joinPath);
-
-                    //if(joinPath != null)
-                    //{
-                    //    Optional<Field> parentEntityField = ReflectionHelper.findFieldByPath(parentEntity, joinPath);
-                    //    if(parentEntityField.isPresent()) joinedEntity = parentEntityField.get().getType();
-                    //    else throw new RuntimeException(String.format("Field NOT FOUND by path '%s' in ENTITY Class: %s!", joinPath, parentEntity.getSimpleName()));
-                    //    //TODO: resolve Collection type: if(Collection.class.isAssignableFrom(joinedEntity)) joinedEntity = (Class<?>) ((ParameterizedType) parentEntityField.get().getGenericType()).getActualTypeArguments()[0];
-                    //}
-
-                    parentPath = Core.findFromPath(roots, joinedEntity, joinPath);
+                    joinPath = Helper.getPathWithoutLastItem(joinPath);
+                    parentPath = Core.findFromPath(roots, joinPath);
                 }
                 while(parentPath == null && StringUtils.isNotEmpty(joinPath));
 
-                //NOTICE: WHILE alternative (instead of DO-WHILE) - preserve joinPath value
-                //String parentJoinPath = Helper.getPathWithoutLastItem(joinPath);
-                //From<?,?> parentPath = Core.findFromPath(roots, parentEntity, parentJoinPath);
-                //while(parentPath == null && StringUtils.isNotEmpty(parentJoinPath))
-                //{
-                //    parentJoinPath = Helper.getPathWithoutLastItem(parentJoinPath);
-                //    parentPath = Core.findFromPath(roots, parentEntity, parentJoinPath);
-                //}
-
-                if(parentPath != null)  //join the remaining part of the join-path to childEntity Path
+                if(parentPath != null)
                 {
                     String parentJoinPath = Core.getJoinPathString(parentPath);
                     if(parentJoinPath != null)
@@ -1613,26 +1561,29 @@ public interface EntityService<E>
                         parentJoinPaths.forEach(fieldJoinPaths::removeFirstOccurrence);    //remove existing join paths from fieldJoinPaths
                     }
 
-                    childPath = Core.generateJoinPath(parentPath, childEntity, fieldJoinPaths);
+                    childPath = Core.generateJoinPath(parentPath, fieldJoinPaths);
                 }
-                else throw new RuntimeException(String.format("JoinPath NOT FOUND for Parent ENTITY Class: %s!", parentEntity.getSimpleName()));
-
-                //NOTICE: verify field exists in generated JoinPath
-                //if(fieldJoinPaths.size() <= 1) //NOT NEEDED: resolved childPath Entity must contain this field
+                else
                 {
-                    String fieldName = fieldJoinPaths.getLast();
-                    childEntity = childPath.getJavaType();    //override childEntity by next fieldPath entity (resolve fieldPath completely)
-                    Optional<Field> fieldOptional = ReflectionHelper.findModelField(childEntity, fieldName);
-                    if(!fieldOptional.isPresent()) throw new RuntimeException(String.format("Field '%s' NOT FOUND in ENTITY Class: %s!", fieldName, childEntity.getSimpleName()));
+                    throw new RuntimeException(String.format("JoinPath NOT FOUND for Parent ENTITY Class: %s!", parentEntity.getSimpleName()));
                 }
+            }
+
+            String fieldName = fieldJoinPaths.getLast();
+            Class<?> pathEntity = childPath.getJavaType();
+            Optional<Field> fieldOptional = ReflectionHelper.findModelField(pathEntity, fieldName);
+            if(fieldOptional.isEmpty())
+            {
+                throw new IllegalStateException(String.format("Field '%s' NOT FOUND in ENTITY Class: %s!", fieldName, pathEntity.getSimpleName()));
             }
 
             return childPath;
         }
 
-        private static <T> From<?, T> findFromPath(Set<? extends From<?, ?>> roots, Class<?> entity, String joinPath)
+        private static <T> From<?, T> findFromPath(Set<? extends From<?, ?>> roots, String joinPath)
         {
             //TODO: PERFOMANCE IMPROVEMENT - save entity Path by Class into Map<Class, Path> (avoid findFromPath for every filter)
+
             //NOTICE: String joinPath is path from Root to Join Entity without final field (joinEntity1.joinEntity2)
             //NOTICE: findFromPath will fail to find FromPath for Entity by joinPath if wrong entity parameter is provided for path
             //NOTICE-FIXED: method findFromPath is NOT parentEntity agnostic - Path verification by joinPath string
@@ -1647,45 +1598,43 @@ public interface EntityService<E>
                 //resolve only 1st Root path (Queried <E> Root Entity)
                 if(r instanceof Root && ++i > 1) break; //NOTICE: possible BUG if cross-join RootPath is at first position instead of queried <E> Root Entity
 
-                String entityJoinPath = (StringUtils.isNotEmpty(joinPath)) ? Core.getJoinPathString(r) : null;
+                String currentJoinPath = (StringUtils.isNotEmpty(joinPath)) ? Core.getJoinPathString(r) : null;
 
                 //logger.info(entity.getSimpleName() + " ?= " + f.getJavaType().getSimpleName());
-                //NOTICE: check if Entity joinPath is correct in case joinPath exists (NOT root Entity)
-                if(StringUtils.isNotEmpty(joinPath))
+                //if(r.getJavaType().equals(entity)) //entity = joinPath target entity
                 {
-                    if(entityJoinPath != null && joinPath.equals(entityJoinPath)) path = (From<?, T>) r;
+                    //NOTICE: check if Entity joinPath is correct in case joinPath exists (NOT root Entity)
+                    if(StringUtils.isNotEmpty(joinPath))
+                    {
+                        if(joinPath.equals(currentJoinPath)) path = (From<?, T>) r;
+                    }
+                    else //if(path instanceof Root) //verify only Root paths are resolved when null/empty joinPath
+                    {
+                        path = (From<?, T>) r;
+                    }
+                    //else
+                    //{
+                    //    throw new IllegalStateException(String.format("Found From (%s) path '%s' doesn't match '%s' join-path!", r.getJavaType().getSimpleName(), currentJoinPath, joinPath));
+                    //}
                 }
-                else //if(path instanceof Root) //verify only Root paths are resolved when null/empty joinPath
-                {
-                    path = (From<?, T>) r;
-                }
-                //else
-                //{
-                //    throw new IllegalStateException(String.format("Found From (%s) path '%s' doesn't match '%s' join-path!", r.getJavaType().getSimpleName(), currentJoinPath, joinPath));
-                //}
 
-                if(path == null)    //continue searching - recursion dive
+                if(path == null)    //continue searching
                 {
                     if(StringUtils.isNotEmpty(joinPath))    //verify path
                     {
-                        if(entityJoinPath == null || joinPath.startsWith(entityJoinPath))
+                        if(currentJoinPath == null || joinPath.startsWith(currentJoinPath))
                         {
-                            path = Core.findFromPath(r.getJoins(), entity, joinPath);
+                            path = Core.findFromPath(r.getJoins(), joinPath);
                         }
                     }
                     else
                     {
-                        path = Core.findFromPath(r.getJoins(), entity, joinPath);
+                        path = Core.findFromPath(r.getJoins(), joinPath);
                     }
                 }
 
                 if(path != null)
                 {
-                    if(path.getJavaType() != entity)
-                    {
-                        throw new IllegalStateException(String.format("Found From (%s) path '%s' isn't of '%s' type!", r.getJavaType().getSimpleName(), joinPath, entity.getSimpleName()));
-                    }
-
                     break;  //From path found!
                 }
             }
@@ -1713,9 +1662,9 @@ public interface EntityService<E>
             return joinPathString;
         }
 
-        private static <T> Root<? extends T> findOrGenerateRootPath(CriteriaBuilder cb, CriteriaQuery<?> query, Path<?> parentFieldPath, Pair<Class<? extends T>, String> joinEntityColumn)
+        private static <T> Root<T> findOrGenerateRootPath(CriteriaBuilder cb, CriteriaQuery<?> query, Path<?> parentFieldPath, Class<T> entity, String joinColumn)
         {
-            Root<? extends T> root = Core.findEntityRootPath(query.getRoots(), joinEntityColumn.getKey());
+            Root<T> root = Core.findEntityRootPath(query.getRoots(), entity);
             List<Expression> orgPredicates = (query.getRestriction() != null) ? new ArrayList(query.getRestriction().getExpressions()) : new ArrayList();
 
             /*
@@ -1743,15 +1692,15 @@ public interface EntityService<E>
             {
                 //Simulate LEFT OUTER JOIN using CROSS JOIN & SubQuery - check if join reference does NOT exist
                 //BUG WARNING: Entities without cross-join references have wildcard values (any value from join-table as result of Cartesian product)
-                Subquery<? extends T> subQuery = query.subquery(joinEntityColumn.getKey());
-                Root subRoot = subQuery.from(joinEntityColumn.getKey());
-                Path<?> subJoinFieldPath = subRoot.get(joinEntityColumn.getValue());
+                Subquery<T> subQuery = query.subquery(entity);
+                Root subRoot = subQuery.from(entity);
+                Path<?> subJoinFieldPath = subRoot.get(joinColumn);
                 Predicate subQueryRestriction = cb.equal(parentFieldPath, subJoinFieldPath);
                 subQuery.select(subRoot).where(subQueryRestriction);
 
-                root = query.from(joinEntityColumn.getKey());
-                root.alias(joinEntityColumn.getKey().getSimpleName()+(query.getRoots().size()-1));
-                Path<?> joinFieldPath = root.get(joinEntityColumn.getValue());
+                root = query.from(entity);
+                root.alias(entity.getSimpleName()+(query.getRoots().size()-1));
+                Path<?> joinFieldPath = root.get(joinColumn);
                 Predicate crossJoinRestriction = cb.or(cb.equal(parentFieldPath, joinFieldPath), cb.not(cb.exists(subQuery)));
                 orgPredicates.add(crossJoinRestriction);
                 query.where(orgPredicates.toArray(new Predicate[]{}));
@@ -1760,7 +1709,7 @@ public interface EntityService<E>
             return root;
         }
 
-        private static <T> Root<? extends T> findEntityRootPath(Set<? extends Root<?>> roots, Class<T> entity)
+        private static <T> Root<T> findEntityRootPath(Set<? extends Root<?>> roots, Class<T> entity)
         {
             return (Root<T>) Core.findEntityPath(roots, entity);
         }
@@ -1799,59 +1748,29 @@ public interface EntityService<E>
             return fieldColumn;
         }
 
-        private static <T> Path<T> findOrGenerateFieldJoinPath(Set<? extends From<?,?>> roots, Class<?> parentEntity, Pair<Class<?>, String> fieldEntityPath)
+        private static <T> Path<T> findOrGenerateFieldJoinPath(Set<? extends From<?,?>> roots, Class<?> parentEntity, String fieldPath)
         {
             Path<T> fieldColumnPath = null;
 
             //NOTICE: Hibernate auto-join could NOT be used since it uses 'JOIN' instead of 'LEFT JOIN' which results with unexpected reduced resultset
             //if(true) return (Path<T>) Core.generateFieldPath(roots, parentEntity, fieldPath);
 
-            if(StringUtils.isNotBlank(fieldEntityPath.getValue()))
+            if(StringUtils.isNotBlank(fieldPath))
             {
-                Path<?> path = Core.findOrGenerateJoinPath(roots, parentEntity, fieldEntityPath);
-                String fieldName = ReflectionHelper.getFieldNameFromPath(fieldEntityPath.getValue());
-                if(StringUtils.isNotBlank(fieldName))
-                {
-                    fieldColumnPath = path.get(fieldName);
-                }
+                LinkedList<String> fieldPaths = ReflectionHelper.pathToLinkedList(fieldPath);
+                Path<?> path = Core.findOrGenerateJoinPath(roots, parentEntity, fieldPaths);
+
+                String fieldName = fieldPaths.getLast();
+                if(StringUtils.isNotBlank(fieldName)) fieldColumnPath = path.get(fieldName);
             }
 
             return fieldColumnPath;
         }
 
-        //NOTICE: supports cross-join fieldPath
-        //WARNING: cross-join is NOT RECOMMENDED for large datasets - significantly reduces performance!
-        //BEST PRACTICE: recommended Entity model mapping of unrelated associations using @JoinColumn + @Where & FetchType.LAZY
-        private static <T> Path<T> findOrGenerateFieldJoinPath(CriteriaBuilder cb, CriteriaQuery<?> query, Class<?> parentEntity, Pair<Class<?>, String> fieldEntityPath)
+        private static <T> Path<T> findOrGenerateFieldJoinPath(CriteriaBuilder cb, CriteriaQuery<?> query, Class<?> parentEntity, String fieldPath)
         {
-            Path<T> fieldColumnPath = null;
-
-            if(StringUtils.isNotBlank(fieldEntityPath.getValue()))
-            {
-                String crossJoinPathRegex = "\\(([^\\[\\]\\s]+)\\*([^\\[\\]\\s\\.]+)\\)\\.([^\\[\\]\\s]+)";
-                Pattern crossJoinRegex = Pattern.compile(crossJoinPathRegex);
-                Matcher crossJoinMatcher = crossJoinRegex.matcher(fieldEntityPath.getValue());
-                if(crossJoinMatcher.matches())
-                {
-                    String sourceEntityJoinColumn = crossJoinMatcher.group(1);
-                    Pair<Class<?>, String> sourceEntityField = ReflectionHelper.findEntityFieldByPath(parentEntity, sourceEntityJoinColumn, true);
-                    Path<?> parentJoinPath = Core.findOrGenerateFieldJoinPath(query.getRoots(), parentEntity, sourceEntityField);
-
-                    String fieldJoinColumn = crossJoinMatcher.group(2);
-                    Pair<Class<?>, String> joinEntityField = ReflectionHelper.findEntityFieldByPath(fieldEntityPath.getKey(), fieldJoinColumn, true);
-                    Root<?> crossJoinRoot = Core.findOrGenerateRootPath(cb, query, parentJoinPath, joinEntityField);
-                    //Join<?,?> crossJoinRoot = this.addLeftJoinOn(cb, query, (From<?,?>) parentJoinPath.getParentPath(), ReflectionHelper.getFieldNameFromPath(sourceEntityJoinColumn), fieldEntity, fieldJoinColumn, null);
-
-                    String fieldColumn = crossJoinMatcher.group(3);
-                    //fieldColumnPath = this.generateFieldPath(Sets.newHashSet(crossJoinRoot), crossJoinRoot.getJavaType(), fieldColumn);
-                    Pair<Class<?>, String> entityField = ReflectionHelper.findEntityFieldByPath(fieldEntityPath.getKey(), fieldColumn, true);
-                    fieldColumnPath = Core.findOrGenerateFieldJoinPath(Sets.newHashSet(crossJoinRoot), crossJoinRoot.getJavaType(), entityField);
-                }
-                else    //NOTICE: default flow (regular entity-model joins)
-                {
-                    fieldColumnPath = Core.findOrGenerateFieldJoinPath(query.getRoots(), parentEntity, fieldEntityPath);
-                }
-            }
+            //NOTICE: default flow (regular entity-model joins) - removed cross-join possibility
+            Path<T> fieldColumnPath = Core.findOrGenerateFieldJoinPath(query.getRoots(), parentEntity, fieldPath);
 
             return fieldColumnPath;
         }
@@ -1862,7 +1781,7 @@ public interface EntityService<E>
      */
     public static class PredicateUtil
     {
-        private static Predicate combinePredicates(CriteriaBuilder cb, Predicate pred1, Predicate pred2, QueryExpression.LogicOperator logicOperator)
+        private static Predicate combinePredicates(CriteriaBuilder cb, Predicate pred1, Predicate pred2, QueryExpression.Conditional.Operator operator)
         {
             Predicate predicate = null;
 
@@ -1870,7 +1789,7 @@ public interface EntityService<E>
             else if(pred1 == null && pred2 != null) predicate = pred2;
             else if(pred1 != null && pred2 != null)
             {
-                switch(logicOperator)
+                switch(operator)
                 {
                     case AND:
                     {
@@ -1918,7 +1837,7 @@ public interface EntityService<E>
 
         private static <T extends Comparable<? super T>> T[] getModValues(QueryExpression.Filter<T> filter)
         {
-            switch(filter.getValueModifier())
+            switch(filter.getMod())
             {
                 case NONE: return filter.getValue();
                 case LikeL: return (T[]) Arrays.stream(filter.getValue()).map(v -> "%"+v).toArray(String[]::new);
@@ -1928,7 +1847,7 @@ public interface EntityService<E>
                 case SplitLikeL: return (T[]) Arrays.stream(filter.getValue()).map(v -> String.valueOf(v).trim().split(StringUtils.SPACE)).flatMap(v -> Arrays.stream(v.clone())).map(v -> "%"+v).toArray(String[]::new);
                 case SplitLikeR: return (T[]) Arrays.stream(filter.getValue()).map(v -> String.valueOf(v).trim().split(StringUtils.SPACE)).flatMap(v -> Arrays.stream(v.clone())).map(v -> v+"%").toArray(String[]::new);
                 case SplitLikeLR: return (T[]) Arrays.stream(filter.getValue()).map(v -> String.valueOf(v).trim().split(StringUtils.SPACE)).flatMap(v -> Arrays.stream(v.clone())).map(v -> "%"+v+"%").toArray(String[]::new);
-                default: throw new NotImplementedException(String.format("Missing implementation for Filter modifier: %s", filter.getValueModifier()));
+                default: throw new NotImplementedException(String.format("Missing implementation for Filter modifier: %s", filter.getMod()));
             }
         }
 
@@ -1954,11 +1873,12 @@ public interface EntityService<E>
         {
             String key = distinctQuery.getName();
 
-            if(key == null) //generate distinctValue KEY
+            if(key == null)
             {
-                key = distinctQuery.getValueColumnEntityPath().getKey().getSimpleName();
-                if(distinctQuery.getValueColumnEntityPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(distinctQuery.getValueColumnEntityPath().getValue());
-                if(distinctQuery.getLabelColumnEntityPath() != null) key += " and " + distinctQuery.getLabelColumnEntityPath().getValue();
+                //generate distinctValue KEY
+                //TODO: key = distinctQuery.getEntity().getSimpleName();
+                if(distinctQuery.getValueColumnPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(distinctQuery.getValueColumnPath());
+                if(distinctQuery.getLabelColumnPath() != null) key += " and " + distinctQuery.getLabelColumnPath();
 
                 key = WordUtils.capitalize(key.replaceAll("[\\._]", " "));
                 key = StringUtils.uncapitalize(StringUtils.deleteWhitespace(key));
@@ -1971,25 +1891,14 @@ public interface EntityService<E>
         {
             String key = metaQuery.getName();
 
-            if(key == null) //generate metaValue KEY
+            if(key == null)
             {
-                String legacyKeyConfigString = System.getProperty(ConstantsUtil.ENTITY_SERVICE_META_VALUES_LEGACY_KEYS, BooleanUtils.FALSE);
-                if(BooleanUtils.toBoolean(legacyKeyConfigString))
-                {
-                    key = metaQuery.getValueColumnEntityPath().getKey().getSimpleName();
-                    if(metaQuery.getValueColumnEntityPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(metaQuery.getValueColumnEntityPath().getValue());
-                    if(metaQuery.getLabelColumnEntityPath() != null) key += " by " + metaQuery.getLabelColumnEntityPath().getValue().replaceAll(EntityService.LABEL_PATHS_SEPARATOR, " and ");
-                    if(metaQuery.getFunc() != null) key += " " + StringUtils.lowerCase(metaQuery.getFunc().name());
-                    if(metaQuery.getFilters() != null) for(QueryExpression.Filter f : metaQuery.getFilters()) key += " " + f.getName();
-                }
-                else
-                {
-                    key = metaQuery.getValueColumnEntityPath().getKey().getSimpleName();
-                    if(metaQuery.getFunc() != null) key += " " + StringUtils.lowerCase(metaQuery.getFunc().name());
-                    if(metaQuery.getValueColumnEntityPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(metaQuery.getValueColumnEntityPath().getValue());
-                    if(metaQuery.getLabelColumnEntityPath() != null) key += " by " + metaQuery.getLabelColumnEntityPath().getValue().replaceAll(EntityService.LABEL_PATHS_SEPARATOR, " and ");
-                    if(metaQuery.getFilters() != null) for(QueryExpression.Filter f : metaQuery.getFilters()) key += " " + f.getName();
-                }
+                //generate metaValue KEY and ADD to metaValues
+                //TODO: key = metaQuery.getEntity().getSimpleName();
+                if(metaQuery.getValueColumnPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(metaQuery.getValueColumnPath());
+                if(metaQuery.getLabelColumnPath() != null) key += " by " + metaQuery.getLabelColumnPath().replaceAll(EntityService.LABEL_PATHS_SEPARATOR, " and ");
+                if(metaQuery.getFunc() != null) key += " " + StringUtils.lowerCase(metaQuery.getFunc().name());
+                if(metaQuery.getFilters() != null) for(QueryExpression.Filter f : metaQuery.getFilters()) key += " " + f.getName();
 
                 key = WordUtils.capitalize(key.replaceAll("[\\._]", " "));
                 key = StringUtils.uncapitalize(StringUtils.deleteWhitespace(key));
@@ -2041,7 +1950,20 @@ public interface EntityService<E>
             return genericInterface;
         }
 
-        //PARSE values for other data-types (e.g. type Boolean & func EQ)
+        private static String getPathWithoutLastItem(String fieldPath)
+        {
+            String path = null;
+
+            if(fieldPath != null)
+            {
+                int fieldStartIndex = fieldPath.lastIndexOf(ReflectionHelper.PATH_SEPARATOR);
+                if(fieldStartIndex >= 0) path = fieldPath.substring(0, fieldStartIndex);
+            }
+
+            return path;
+        }
+
+        //PARSE values for other data-types (e.g. type Boolean & function EQ)
         private static <T extends Comparable<? super T>> Comparable[] parseValues(Class typeClazz, T... values)
         {
             Comparable[] vals = values;
@@ -2073,13 +1995,8 @@ public interface EntityService<E>
                 if(Long.class.isAssignableFrom(clazz) || long.class.isAssignableFrom(clazz)) return Long.parseLong(value);
                 if(Float.class.isAssignableFrom(clazz) || float.class.isAssignableFrom(clazz)) return Float.parseFloat(value);
                 if(Double.class.isAssignableFrom(clazz) || double.class.isAssignableFrom(clazz)) return Double.parseDouble(value);
-                //if(clazz.isEnum() || Enum.class.isAssignableFrom(clazz)) return Enum.valueOf(clazz, value);
-                if(clazz.isEnum() || Enum.class.isAssignableFrom(clazz))
-                {
-                    return (Comparable) Arrays.stream(clazz.getEnumConstants())
-                            .filter(e -> ((Enum) e).name().equalsIgnoreCase(value)).findAny()
-                            .orElseGet(() -> Enum.valueOf(clazz, value));
-                }
+                if(clazz.isEnum() || Enum.class.isAssignableFrom(clazz)) return Enum.valueOf(clazz, value);
+                //if(clazz.isEnum() || Enum.class.isAssignableFrom(clazz)) return (Comparable) Arrays.stream(clazz.getEnumConstants()).filter(v -> value.equalsIgnoreCase(v.toString())).findAny().orElse(value);
                 if(Date.class.isAssignableFrom(clazz))
                 {
                     Date dateValue = DateTimeFormatUtil.parseDateTimeISO8601(value);

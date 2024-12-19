@@ -1,12 +1,15 @@
 package info.nino.jpatron.jsonapi.request;
 
-import info.nino.jpatron.annotiation.JsonApi;
-import info.nino.jpatron.annotiation.JsonApiInject;
+import info.nino.jpatron.jsonapi.annotiation.JsonApi;
+import info.nino.jpatron.jsonapi.annotiation.JsonApiInject;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.helpers.RegexHelper;
+import info.nino.jpatron.request.QueryExpression;
+import info.nino.jpatron.request.QuerySort;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.event.Event;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.container.ContainerRequestContext;
@@ -53,7 +56,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
 
     @Inject
     @ConfigProperty(name = ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, defaultValue = BooleanUtils.TRUE)
-    Boolean throwInvalidPathExceptions;
+    Instance<Boolean> configPropertyThrowInvalidPathExceptions;
 
     @Context
     ResourceInfo resourceInfo;
@@ -65,6 +68,8 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
     @JsonApiInject
     Event<JsonApiRequest> jsonApiRequestEvent;
 
+    private Boolean throwInvalidPathExceptions;
+
     protected Event<JsonApiRequest> getJsonApiRequestEvent()
     {
         return this.jsonApiRequestEvent;
@@ -73,10 +78,14 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
     @PostConstruct
     public void init()
     {
-        if(this.throwInvalidPathExceptions == null)
+        if(this.configPropertyThrowInvalidPathExceptions.isUnsatisfied())
         {
             String throwInvalidPathExceptionsConfig = System.getProperty(ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, BooleanUtils.TRUE);
             this.throwInvalidPathExceptions = BooleanUtils.toBoolean(throwInvalidPathExceptionsConfig);
+        }
+        else
+        {
+            this.throwInvalidPathExceptions = this.configPropertyThrowInvalidPathExceptions.get();
         }
     }
 
@@ -97,6 +106,8 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
         Class<?> dtoClass = jsonApiAnnot.value();
         if(Object.class.equals(dtoClass)) return;    //dtoClass.isAnnotationPresent(jakarta.persistence.Entity)
 
+        Class<?> entityClass = ReflectionHelper.resolveEntityClassFromDtoClass(dtoClass);
+
         boolean pagination = jsonApiAnnot.pagination();
         boolean distinct = jsonApiAnnot.distinctDataset();
         boolean readOnly = jsonApiAnnot.readOnlyDataset();
@@ -108,7 +119,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
         JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, allowEntityPaths, allowedPaths);
 
-        JsonApiRequest jsonApiRequest = new JsonApiRequest(queryParams, pagination, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
+        JsonApiRequest jsonApiRequest = new JsonApiRequest(entityClass, queryParams, pagination, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
         //this.getJsonApiRequestContext().setJsonApiRequest(jsonApiRequest);
         this.getJsonApiRequestEvent().fire(jsonApiRequest);
     }
@@ -124,12 +135,12 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
     {
         Integer pageSize = JsonApiRequestFilter.DEFAULT_PAGE_SIZE;
         Integer pageNumber =JsonApiRequestFilter.DEFAULT_PAGE_NUMBER;
-        Map<String, Map.Entry<Class<?>, String>> sort = null;
         MultiValuedMap<Class<?>, String> includes = null;
-        Map<Class<?>, Map<String, MultiValuedMap<String, String>>> filters = null;
-        Map<Class<?>, Map<String, MultiValuedMap<String, String>>> searches = null;
+        Map<String, Map.Entry<Class<?>, QuerySort.Direction>> sort = null;
+        Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> filters = null;
+        Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> searches = null;
         Map<Class<?>, MultiValuedMap<String, String>> distinctValues = null;
-        Map<Class<?>, Map<String, MultiValuedMap<String, String>>> metaValues = null;
+        Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> metaValues = null;
 
         String jsonApiQueryParamRegex = "^%s\\[([^\\[\\]\\s]+)\\](?:\\[([^\\[\\]\\s]+)\\])?";
         List<String> regexAllowedPaths = (allowedPaths != null && allowedPaths.length > 0) ? RegexHelper.compileRegexWildcards(allowedPaths) : null;
@@ -178,10 +189,9 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
                         sortPath = sortPath.trim(); //remove leading and trailing spaces ('+' can be serialized as space)
                         if(sortPath.isEmpty()) continue;
 
-                        String sortDirection = null;
-                        if(sortPath.startsWith("-") || sortPath.startsWith("+"))
-                        {
-                            sortDirection = sortPath.substring(0,1);
+                        QuerySort.Direction sortDirection = null;
+                        if (sortPath.startsWith("-") || sortPath.startsWith("+")) {
+                            sortDirection = QuerySort.Direction.resolveDirectionSign(sortPath.charAt(0));
                             sortPath = sortPath.substring(1);
                         }
 
@@ -197,7 +207,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
                                 throw new RuntimeException("Multiple sorting by same Field path!");
                             }
 
-                            sort.put(sortPath, new AbstractMap.SimpleImmutableEntry(sortEntity, sortDirection));
+                            sort.put(sortPath, new AbstractMap.SimpleImmutableEntry<>(sortEntity, sortDirection));
                         }
                     }
                 }
@@ -245,13 +255,13 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
                         Class filterEntity = filterField.getKey();
                         if(filters == null) filters = new HashMap<>();
                         if(!filters.containsKey(filterEntity)) filters.put(filterEntity, new HashMap<>());
-                        Map<String, MultiValuedMap<String, String>> entityFilters = filters.get(filterEntity);
+                        Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>> entityFilters = filters.get(filterEntity);
 
                         String fieldPath = filterField.getValue(); //NOTICE: use filterPath to allow only entityPaths from client
                         if(!entityFilters.containsKey(fieldPath)) entityFilters.put(fieldPath, new HashSetValuedHashMap<>());
-                        MultiValuedMap<String, String> filterOps = entityFilters.get(fieldPath);
+                        MultiValuedMap<QueryExpression.CompareOperator, String> filterOps = entityFilters.get(fieldPath);
 
-                        filterOps.putAll(operator, filterValues);
+                        filterOps.putAll(QueryExpression.CompareOperator.valueOf(operator), filterValues);
                     }
                 }
 
@@ -271,13 +281,13 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
                         Class searchEntity = searchField.getKey();
                         if(searches == null) searches = new HashMap<>();
                         if(!searches.containsKey(searchEntity)) searches.put(searchEntity, new HashMap<>());
-                        Map<String, MultiValuedMap<String, String>> entitySearches = searches.get(searchEntity);
+                        Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>> entitySearches = searches.get(searchEntity);
 
                         String fieldPath = searchField.getValue();
                         if(!entitySearches.containsKey(fieldPath)) entitySearches.put(fieldPath, new HashSetValuedHashMap<>());
-                        MultiValuedMap<String, String> searchModifiers = entitySearches.get(fieldPath);
+                        MultiValuedMap<QueryExpression.ValueModifier, String> searchModifiers = entitySearches.get(fieldPath);
 
-                        searchModifiers.putAll(searchModifier, searchValues);
+                        searchModifiers.putAll(QueryExpression.ValueModifier.valueOf(searchModifier), searchValues);
                     }
                 }
 
@@ -336,10 +346,10 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
                         Class metaEntity = valueField.getKey();
                         if(metaValues == null) metaValues = new HashMap<>();
                         if(!metaValues.containsKey(metaEntity)) metaValues.put(metaEntity, new HashMap<>());
-                        Map<String, MultiValuedMap<String, String>> entityMetaValues = metaValues.get(metaEntity);
+                        Map<String, MultiValuedMap<QueryExpression.Function, String>> entityMetaValues = metaValues.get(metaEntity);
 
                         if(!entityMetaValues.containsKey(valueField.getValue())) entityMetaValues.put(valueField.getValue(), new HashSetValuedHashMap<>());
-                        MultiValuedMap<String, String> metaFuncs = entityMetaValues.get(valueField.getValue());
+                        MultiValuedMap<QueryExpression.Function, String> metaFuncs = entityMetaValues.get(valueField.getValue());
 
                         //replaced: metaFuncs.addAll(function, labelColumnPaths);
                         CollectionUtils.emptyIfNull(labelColumnPaths).forEach(labelColumnPath ->
@@ -349,12 +359,12 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
                                 Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(dtoClass, labelColumnPath, allowEntityPaths, regexAllowedPaths);
                                 if(labelField != null)
                                 {
-                                    metaFuncs.put(function, labelField.getValue());
+                                    metaFuncs.put(QueryExpression.Function.valueOf(function), labelField.getValue());
                                 }
                             }
                             else
                             {
-                                metaFuncs.put(function, null);
+                                metaFuncs.put(QueryExpression.Function.valueOf(function), null);
                             }
                         });
                     }

@@ -7,9 +7,9 @@ import info.nino.jpatron.request.ApiRequest;
  */
 public class JsonApiRequest extends ApiRequest
 {
-    public JsonApiRequest(ApiRequest.QueryParams queryParams, boolean pagination, boolean distinct, boolean readOnly, String[] fetchEntityPaths, String[] entityGraphPaths)
+    public JsonApiRequest(Class<?> rootEntity, ApiRequest.QueryParams queryParams, boolean pagination, boolean distinct, boolean readOnly, String[] fetchEntityPaths, String[] entityGraphPaths)
     {
-        super(queryParams, pagination, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
+        super(rootEntity, queryParams, pagination, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
     }
 
     /**

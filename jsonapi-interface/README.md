@@ -118,11 +118,11 @@ Examples:
 - `distinct[gender.id]=gender.name`
 
 ### Meta Values Query Parameters
-#### meta[value-column-path][agg-func] = [group-by-column-path]
+#### meta[value-column-path][agg-function] = [group-by-column-path]
 |        **Value**         | **Description**                                                                                                                                                                                                                                                                                                                         |
 |:------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **\*value-column-path:** | DTO/Entity model path from requested root-entity to value-column (only root DTO properties are allowed by default) - value property to be calculated using aggregation function                                                                                                                                                         |
-|      **agg-func:**       | Aggregation function for meta-values <br/><br/> `COUNT` (default) - count of value-column values <br/> `COUNT_DISTINCT` - count of distinct value-column values <br/> `SUM` - sum of value-column values <br/> `AVG` - average of value-column values <br/> `MIN` - minimum value-column value <br/> `MAX` - maximum value-column value |
+|      **agg-function:**       | Aggregation function for meta-values <br/><br/> `COUNT` (default) - count of value-column values <br/> `COUNT_DISTINCT` - count of distinct value-column values <br/> `SUM` - sum of value-column values <br/> `AVG` - average of value-column values <br/> `MIN` - minimum value-column value <br/> `MAX` - maximum value-column value |
 | **group-by-column-path** | DTO/Entity model path from requested root-entity to group-by-column (only root DTO properties are allowed by default) - group-by property to separate/group meta-values by its values                                                                                                                                                   |
 Examples:
 - `meta[gender.id]`

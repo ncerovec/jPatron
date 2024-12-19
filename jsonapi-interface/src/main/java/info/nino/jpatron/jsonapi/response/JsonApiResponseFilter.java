@@ -1,6 +1,6 @@
 package info.nino.jpatron.jsonapi.response;
 
-import info.nino.jpatron.annotiation.JsonApi;
+import info.nino.jpatron.jsonapi.annotiation.JsonApi;
 import info.nino.jpatron.jsonapi.JsonApiMediaType;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerResponseContext;

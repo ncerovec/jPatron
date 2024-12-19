@@ -1,10 +1,9 @@
 package info.nino.jpatron.pagination;
 
+import info.nino.jpatron.metamodel.PageRequest;
 import info.nino.jpatron.response.ApiPageResponse;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,7 +33,7 @@ public class Page<T> extends ApiPageResponse<T>
     }
 
     /**
-     * Converts Page from one result class to diffrent one using provided mapper function
+     * Converts Page from one result class to different one using provided mapper function
      * @param mapper function used for mapping between source &amp; target classes
      * @return converted Page with data result list of target class
      * @param <R> target Class of converter function
@@ -48,5 +47,16 @@ public class Page<T> extends ApiPageResponse<T>
         p.setMetaValues(metaValues);
 
         return p;
+    }
+
+    /**
+     * Maps Page to different result Object type
+     * @param mapper function used for mapping between source &amp; target class
+     * @return converted object of type R target class
+     * @param <R> target Class of converter function
+     */
+    public <R> R map(Function<ApiPageResponse<T>, ? extends R> mapper)
+    {
+        return mapper.apply(this);
     }
 }
