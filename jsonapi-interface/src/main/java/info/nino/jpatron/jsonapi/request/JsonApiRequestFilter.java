@@ -1,7 +1,7 @@
 package info.nino.jpatron.jsonapi.request;
 
-import info.nino.jpatron.annotiation.JsonApi;
-import info.nino.jpatron.annotiation.JsonApiInject;
+import info.nino.jpatron.jsonapi.annotiation.JsonApi;
+import info.nino.jpatron.jsonapi.annotiation.JsonApiInject;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.helpers.RegexHelper;

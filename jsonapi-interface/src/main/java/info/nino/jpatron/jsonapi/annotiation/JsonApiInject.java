@@ -1,4 +1,4 @@
-package info.nino.jpatron.annotiation;
+package info.nino.jpatron.jsonapi.annotiation;
 
 import jakarta.inject.Qualifier;
 
