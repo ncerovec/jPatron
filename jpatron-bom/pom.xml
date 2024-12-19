@@ -38,6 +38,12 @@
                 <artifactId>jsonapi-interface</artifactId>
                 <version>${project.version}</version>
             </dependency>
+
+            <dependency>
+                <groupId>info.nino.jpatron</groupId>
+                <artifactId>efd-api-interface</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>
