@@ -1,7 +1,7 @@
 package info.nino.jpatron.metamodel;
 
-import info.nino.jpatron.helpers.ReflectionHelper;
-import org.apache.commons.lang3.tuple.Pair;
+import info.nino.jpatron.request.QueryExpression;
+import info.nino.jpatron.request.QuerySort;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -10,7 +10,7 @@ import java.util.Set;
  * Main Entity Service request object
  * Contains parameters used for data/distinct/meta queries
  */
-//TODO fix: QueryExpression suffers from "telescoping constructors problem"
+//TODO fix: QueryExpression suffers from "telescoping constructors problem" - being mitigated by RequesBuilder.java
 public class PageRequest<T>
 {
     /**
@@ -49,14 +49,15 @@ public class PageRequest<T>
     private String[] entityGraphPaths;
 
     /**
-     * Set of sorting parameters of Sort type
+     * Set of sorting parameters of QuerySort type
      */
-    private Set<Sort> sorts = new HashSet<>();
+    private Set<QuerySort> sorts = new HashSet<>();
 
     /**
      * EntityService query-filters
      * Filters which should be used to construct SQL 'where' clause
      * Filters are applied to every query in the request (data/distinct/meta)
+     * //TODO: replace unnecessary initialization with null-check
      */
     private QueryExpression.CompoundFilter queryFilters = new QueryExpression.CompoundFilter();
 
@@ -132,7 +133,7 @@ public class PageRequest<T>
      * @param readOnly true/false flag for the read-only result list
      * @param sorts set of sorting parameters of Sort type
      */
-    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly, Set<Sort> sorts)
+    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly, Set<QuerySort> sorts)
     {
         this(rootEntity, pageSize, pageNumber);
         this.distinctDataset = distinct;
@@ -243,11 +244,11 @@ public class PageRequest<T>
      * Adds sorting parameter to PageRequest object
      * @param rootEntity query root entity (base for column path)
      * @param fieldPath path from rootEntity to sorting field of type String
-     * @param dir sorting direction parameter of type Sort.Direction
+     * @param dir sorting direction parameter of type QuerySort.Direction
      */
-    public void addSort(Class<?> rootEntity, String fieldPath, Sort.Direction dir)
+    public void addSort(Class<?> rootEntity, String fieldPath, QuerySort.Direction dir)
     {
-        sorts.add(new Sort(rootEntity, fieldPath, dir));
+        sorts.add(new QuerySort(rootEntity, fieldPath, dir));
     }
 
     /**
@@ -259,16 +260,16 @@ public class PageRequest<T>
     {
         sort = sort.trim(); //remove leading and trailing spaces ('+' can be serialized as space)
 
-        if(sort.startsWith("-")) this.addSort(rootEntity, sort.substring(1), Sort.Direction.DESC);
-        else if(sort.startsWith("+")) this.addSort(rootEntity, sort.substring(1), Sort.Direction.ASC);
-        else this.addSort(rootEntity, sort, Sort.Direction.ASC);
+        if(sort.startsWith("-")) this.addSort(rootEntity, sort.substring(1), QuerySort.Direction.DESC);
+        else if(sort.startsWith("+")) this.addSort(rootEntity, sort.substring(1), QuerySort.Direction.ASC);
+        else this.addSort(rootEntity, sort, QuerySort.Direction.ASC);
     }
 
     /**
-     * Set of sorting parameters of Sort type
+     * Set of sorting parameters of QuerySort type
      * @return sorts set
      */
-    public Set<Sort> getSorts()
+    public Set<QuerySort> getSorts()
     {
         return sorts;
     }
@@ -325,88 +326,5 @@ public class PageRequest<T>
     public void setMetaColumns(Set<QueryExpression> metaColumns)
     {
         this.metaColumns = metaColumns;
-    }
-
-    /**
-     * SubClass for sorting parameters
-     */
-    public static class Sort
-    {
-        //private Class<?> rootEntity;
-        private Class<?> sortType;
-        private Pair<Class<?>, String> columnEntityPath;
-        private Direction direction;
-
-        /**
-         * Constructor for Sort object
-         * @param rootEntity query root entity (base for column path)
-         * @param columnPath sorting column name or path
-         * @param direction sorting direction
-         */
-        Sort(Class<?> rootEntity, String columnPath, Direction direction)
-        {
-            //this.rootEntity = rootEntity;
-            this.columnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, columnPath, true);
-            this.direction = direction;
-        }
-
-        /**
-         * Constructor for Sort object
-         * @param rootEntity query root entity (base for column path)
-         * @param sortType sorting type class (e.g. sort as integer while column is string)
-         * @param columnPath sorting column name or path
-         * @param direction sorting direction
-         */
-        public Sort(Class<?> rootEntity, String columnPath, Direction direction, Class<?> sortType)
-        {
-            //this.rootEntity = rootEntity;
-            this.columnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, columnPath, true);
-            this.direction = direction;
-            this.sortType = sortType;
-        }
-
-        /**
-         * @return pair of sort entity & column name OR path (from root entity)
-         */
-        public Pair<Class<?>, String> getColumnEntityPath()
-        {
-            return columnEntityPath;
-        }
-
-        /**
-         * @return sorting type class
-         */
-        public Class<?> getSortType()
-        {
-            return sortType;
-        }
-
-        /**
-         * @return sorting direction
-         */
-        public Direction getDirection()
-        {
-            return direction;
-        }
-
-
-        /**
-         * Enum used as direction for Sort parameters
-         */
-        public enum Direction
-        {
-            ASC, DESC;
-
-            /**
-             * Resolves String ("+"/"-") to Direction enum (ASC/DESC)
-             * @param directionSign
-             * @return
-             */
-            public static Direction resolveDirectionSign(String directionSign)
-            {
-                if(("-").equals(directionSign)) return Direction.DESC;
-                else return Direction.ASC;
-            }
-        }
     }
 }

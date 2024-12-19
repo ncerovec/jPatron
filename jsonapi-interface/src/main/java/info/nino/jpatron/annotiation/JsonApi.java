@@ -58,10 +58,10 @@ public @interface JsonApi
      * By default only root fields of the result list DTO object are allowed ('.')
      * '.' - matches all fields in current path
      * '*' - matches all field in current and subsequent paths
-     * 'object/property' - exact path/field matching where 'object' is nested-object in the root of result-object and 'field' is exact field name in that object
-     * e.g. 'person/*' - path matches all fields under the 'person' object (including all field in the nested objects)
-     * e.g. 'person/.' - path matches any field directly in the 'person' object (but none of the fields in the nested objects)
-     * e.g. 'person/*\/number' - path matches any 'number' field in any of the nested objects inside the person object (except in object 'person')
+     * 'object.field' - exact path/field matching where 'object' is nested-object in the root of result-object and 'field' is exact field name in that object
+     * e.g. 'person.*' - path matches all fields under the 'person' object (including all field in the nested objects)
+     * e.g. 'person.' - path matches any field directly in the 'person' object (but none of the fields in the nested objects)
+     * e.g. 'person.*.number' - path matches any 'number' field in any of the nested objects inside the person object (except in object 'person')
      * @return array of allowed DTO/Entity field-paths
      */
     String[] allowedPaths() default {"."};

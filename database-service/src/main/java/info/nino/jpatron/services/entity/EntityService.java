@@ -5,8 +5,9 @@ import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.DateTimeFormatUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.metamodel.PageRequest;
-import info.nino.jpatron.metamodel.QueryExpression;
 import info.nino.jpatron.pagination.Page;
+import info.nino.jpatron.request.QueryExpression;
+import info.nino.jpatron.request.QuerySort;
 import jakarta.persistence.*;
 import jakarta.persistence.criteria.*;
 import jakarta.persistence.metamodel.Attribute;
@@ -461,7 +462,7 @@ public interface EntityService<E>
                     //(concat, nextLabel) -> cb.concat(concat, nextLabel));                       //combiner
                 }
 
-                QueryExpression.Func function = metaVQ.getFunc();
+                QueryExpression.Function function = metaVQ.getFunc();
                 if(function == null) throw new RuntimeException(String.format("AggQuery (%s) - QueryExpression.Func must NOT be null!", EsUtil.getMetaValueKey(metaVQ)));
                 switch(function)
                 {
@@ -602,7 +603,7 @@ public interface EntityService<E>
             return distinctResult;
         }
 
-        private <E> List<Order> getSorting(CriteriaBuilder cb, CriteriaQuery<?> query, Class<E> clazz, Set<PageRequest.Sort> sorts)
+        private <E> List<Order> getSorting(CriteriaBuilder cb, CriteriaQuery<?> query, Class<E> clazz, Set<QuerySort> sorts)
         {
             return sorts.stream()
                     .map(s ->
@@ -687,7 +688,7 @@ public interface EntityService<E>
         {
             List<String> entityGraphPaths = new ArrayList<>(Arrays.asList(ArrayUtils.nullToEmpty(request.getEntityGraphPaths())));
 
-            for(PageRequest.Sort sort : CollectionUtils.emptyIfNull(request.getSorts()))
+            for(QuerySort sort : CollectionUtils.emptyIfNull(request.getSorts()))
             {
                 String sortEntityPath = ReflectionHelper.getPathWithoutLastItem(sort.getColumnEntityPath().getValue());
                 if(StringUtils.isNotBlank(sortEntityPath) && !entityGraphPaths.contains(sortEntityPath)) entityGraphPaths.add(sortEntityPath);
@@ -753,10 +754,10 @@ public interface EntityService<E>
 
                 Map<Object, Object> aggValues = columnAggs.map(a ->
                 {
-                    int labelStartIndex = (agg.getFunc() == QueryExpression.Func.AVG) ? 2 : 1;
+                    int labelStartIndex = (agg.getFunc() == QueryExpression.Function.AVG) ? 2 : 1;
                     String labelsConcat = (a.getElements().size() > labelStartIndex) ? a.getElements().subList(labelStartIndex, a.getElements().size()).stream().map(te -> String.valueOf(a.get(te))).collect(Collectors.joining()) : "value";
 
-                    Number valueCount = (agg.getFunc() == QueryExpression.Func.AVG) ? (Number) a.get(1) : 1;
+                    Number valueCount = (agg.getFunc() == QueryExpression.Function.AVG) ? (Number) a.get(1) : 1;
                     return new AbstractMap.SimpleEntry<String, Map.Entry<Number, Number>>(labelsConcat, new AbstractMap.SimpleEntry<>((Number) a.get(0), valueCount));
                 })
                 .filter(av -> av.getValue().getKey() != null && av.getValue().getValue() != null)
@@ -828,8 +829,10 @@ public interface EntityService<E>
             {
                 QueryExpression.LogicOperator condOperator = condFilter.getLogicOperator();
 
-                Predicate simpleFilters = this.createPredicate(cb, query, rootEntity, condOperator, condFilter.getFilters());
-                Predicate complexSubFilters = this.createPredicate(cb, query, rootEntity, condOperator, condFilter.getCompoundFilters());
+                QueryExpression.Filter<?>[] simpleFilterArray = (condFilter.getFilters() != null) ? condFilter.getFilters().toArray(new QueryExpression.Filter[0]) : null;
+                Predicate simpleFilters = this.createPredicate(cb, query, rootEntity, condOperator, simpleFilterArray);
+                QueryExpression.CompoundFilter[] complexFilterArray = (condFilter.getCompoundFilters() != null) ? condFilter.getCompoundFilters().toArray(new QueryExpression.CompoundFilter[0]) : null;
+                Predicate complexSubFilters = this.createPredicate(cb, query, rootEntity, condOperator, complexFilterArray);
                 Predicate complexPredicate = PredicateUtil.combinePredicates(cb, simpleFilters, complexSubFilters, condOperator);
 
                 condPredicate = PredicateUtil.combinePredicates(cb, condPredicate, complexPredicate, logicOperator);

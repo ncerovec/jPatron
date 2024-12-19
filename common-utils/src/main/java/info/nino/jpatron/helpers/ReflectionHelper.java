@@ -1,7 +1,7 @@
 package info.nino.jpatron.helpers;
 
 import info.nino.jpatron.annotiation.EntityClass;
-import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.beans.BeanInfo;
@@ -9,11 +9,23 @@ import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.*;
-import java.util.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.GenericDeclaration;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
-public class ReflectionHelper
-{
+public class ReflectionHelper {
+
     public static final String PATH_SEPARATOR = "."; //PATH_DELIMITER
     private static final List<String> ENTITY_ANNOTATION_CLASSES = Arrays.asList("jakarta.persistence.Entity", "jakarta.persistence.Embeddable");
 
@@ -228,7 +240,7 @@ public class ReflectionHelper
         ReflectionHelper.verifyIsEntityClass(clazz);
         ReflectionHelper.verifyClassHasField(clazz, fieldName);
 
-        return new ImmutablePair<>(clazz, fieldName);
+        return new MutablePair<>(clazz, fieldName);
     }
 
     public static Class<?> resolveEntityClassFromDtoClass(Class<?> clazz)

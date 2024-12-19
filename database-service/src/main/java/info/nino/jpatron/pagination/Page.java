@@ -33,7 +33,7 @@ public class Page<T> extends ApiPageResponse<T>
     }
 
     /**
-     * Converts Page from one result class to diffrent one using provided mapper function
+     * Converts Page from one result class to different one using provided mapper function
      * @param mapper function used for mapping between source &amp; target classes
      * @return converted Page with data result list of target class
      * @param <R> target Class of converter function
@@ -47,5 +47,16 @@ public class Page<T> extends ApiPageResponse<T>
         p.setMetaValues(metaValues);
 
         return p;
+    }
+
+    /**
+     * Maps Page to different result Object type
+     * @param mapper function used for mapping between source &amp; target class
+     * @return converted object of type R target class
+     * @param <R> target Class of converter function
+     */
+    public <R> R map(Function<ApiPageResponse<T>, ? extends R> mapper)
+    {
+        return mapper.apply(this);
     }
 }

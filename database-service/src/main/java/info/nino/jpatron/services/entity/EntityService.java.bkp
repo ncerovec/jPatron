@@ -1963,7 +1963,7 @@ public interface EntityService<E>
             return path;
         }
 
-        //PARSE values for other data-types (e.g. type Boolean & func EQ)
+        //PARSE values for other data-types (e.g. type Boolean & function EQ)
         private static <T extends Comparable<? super T>> Comparable[] parseValues(Class typeClazz, T... values)
         {
             Comparable[] vals = values;
