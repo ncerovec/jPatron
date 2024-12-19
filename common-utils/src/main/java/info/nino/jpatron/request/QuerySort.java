@@ -35,7 +35,7 @@ public class QuerySort {
     }
 
     /**
-     * @return pair of sort entity & column name OR path (from root entity)
+     * @return pair of sort entity &amp; column name OR path (from root entity)
      */
     public Pair<Class<?>, String> getColumnEntityPath() {
         return columnEntityPath;
