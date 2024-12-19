@@ -17,6 +17,7 @@
         <module>common-utils</module>
         <module>database-service</module>
         <module>jsonapi-interface</module>
+        <module>efd-api-interface</module>
     </modules>
 
     <developers>
