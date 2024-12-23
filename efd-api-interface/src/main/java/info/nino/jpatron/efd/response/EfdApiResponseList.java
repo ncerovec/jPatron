@@ -30,8 +30,8 @@ public class EfdApiResponseList<T> implements EfdResponseInterface
     public EfdApiResponseList(ApiPageResponse<T> page)
     {
         this.setData(page.getContent());
-        this.setMetadata(new EfdApiMetadata(page.getPageSize(),
-                                            page.getPageNumber(),
+        this.setMetadata(new EfdApiMetadata(page.getPageNumber(),
+                                            page.getPageSize(),
                                             page.getTotalPages(),
                                             page.getTotalItems()));
     }

@@ -44,6 +44,8 @@ import java.util.stream.Collectors;
 public class EfdApiRequestFilter implements ContainerRequestFilter {
 
     private static final String QUERY_PARAM_VALUE_SEPARATOR = ConstantsUtil.COMMA;
+    private static final char QUERY_PARAM_ESCAPE_CHAR = '\\';
+    private static final char QUERY_PARAM_VALUE_QUOTE = '"';
     private static final Integer DEFAULT_PAGE_NUMBER = 1;
     private static final Integer DEFAULT_PAGE_SIZE = 10;
 
@@ -222,7 +224,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
                 .toList();
 
         return (compoundQueryTerms.size() > 1)
-                ? new QueryExpression.CompoundFilter(QueryExpression.LogicOperator.AND, queryTerms.toArray(new QueryExpression.CompoundFilter[0]))
+                ? new QueryExpression.CompoundFilter(QueryExpression.LogicOperator.AND, compoundQueryTerms.toArray(new QueryExpression.CompoundFilter[0]))
                 : compoundQueryTerms.get(0);
     }
 
@@ -233,8 +235,8 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
         queryTerm = queryTerm.trim();
 
         // Handle parentheses (sub query term)
-        if (queryTerm.startsWith("(")) {
-            var subQueryEndIndex = queryTerm.indexOf(")");
+        if (queryTerm.length() > 2 && queryTerm.indexOf('(') == 0) {
+            var subQueryEndIndex = indexOfFirstUnescapedChar(queryTerm, ')');
             var subExpression = queryTerm.substring(1, subQueryEndIndex);
             queryTerm = queryTerm.substring(subQueryEndIndex + 1);
 
@@ -245,7 +247,6 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
             } else {
                 parentTerm = subTerm;
             }
-
         }
 
         if (queryTerm.isBlank()) {
@@ -274,7 +275,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
         if (parentTerm == null) {
             //NOTICE: compoundOperator can be null
-            parentTerm = new QueryExpression.CompoundFilter(compoundOperator);
+            parentTerm = new QueryExpression.CompoundFilter((compoundOperator != null) ? compoundOperator : QueryExpression.LogicOperator.AND);
         }
 
         if (compoundOperator == null) {
@@ -311,17 +312,25 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
     }
 
     private QueryExpression.Filter<?> parseSimpleTerm(Class<?> clazz, String query) {
-        Pattern termRegex = Pattern.compile("^([^\\[\\]\\s=!~<>#]+)(:[=!~<>#]{0,2})([^\\n]*)");
+        Pattern termRegex = Pattern.compile("^([^\\s:=<>!#^~]+)[\\s]*(:[=<>!#^~]{0,2})[\\s]*([^\\n]*)");
         Matcher termMatcher = termRegex.matcher(query);
         if (termMatcher.matches()) {
             String fieldPath = termMatcher.group(1);
+            this.checkIfPathAllowed(fieldPath, this.regexAllowedPaths);
+
             EfdApiRequest.Comparator cmp = Arrays.stream(EfdApiRequest.Comparator.values())
                     .filter(c -> c.getValue().equals(termMatcher.group(2)))
                     .findAny().orElseThrow();
             String value = termMatcher.group(3);
 
-            this.checkIfPathAllowed(fieldPath, this.regexAllowedPaths);
-            return new QueryExpression.Filter<>(clazz, fieldPath, cmp.getCompareOperator(), value);
+            if (cmp == EfdApiRequest.Comparator.IN) {
+                String[] values = Arrays.stream(value.split(QUERY_PARAM_VALUE_SEPARATOR))
+                        .map(String::trim).map(this::removeSurroundingQuotes).toArray(String[]::new);
+                return new QueryExpression.Filter<>(clazz, fieldPath, cmp.getCompareOperator(), values);
+            } else {
+                value = this.removeSurroundingQuotes(value);
+                return new QueryExpression.Filter<>(clazz, fieldPath, cmp.getCompareOperator(), value);
+            }
         } else {
             throw new IllegalArgumentException("Term '%s' doesn't match EFD REST-API guideline syntax!".formatted(query));
         }
@@ -334,8 +343,13 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
         int depth = 0;
         for (int i = 0; i < query.length(); i++) {
-            if (query.charAt(i) == '(') depth++;
-            if (query.charAt(i) == ')') depth--;
+            if (query.charAt(i) == '(' && query.charAt(i - 1) != QUERY_PARAM_ESCAPE_CHAR) {
+                depth++;
+            }
+            if (query.charAt(i) == ')' && query.charAt(i - 1) != QUERY_PARAM_ESCAPE_CHAR) {
+                depth--;
+            }
+
             if (depth == 0) {
                 for (Map.Entry<String, Integer> entry : literalIndexes.entrySet()) {
                     if (entry.getValue() < 0 && query.startsWith(entry.getKey(), i)) {
@@ -346,6 +360,24 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
         }
 
         return literalIndexes;
+    }
+
+    private String removeSurroundingQuotes(String str) {
+        if (str != null && str.length() >= 2
+                && indexOfFirstUnescapedChar(str, QUERY_PARAM_VALUE_QUOTE) == 0
+                && indexOfFirstUnescapedChar(str, QUERY_PARAM_VALUE_QUOTE) == str.length()) {
+            return str.substring(1, str.length() - 1);
+        }
+        return str; // Return the original string if no quotes are present
+    }
+
+    private int indexOfFirstUnescapedChar(String queryTerm, char character) {
+        int index = queryTerm.indexOf(character);
+        if (index > 0 && queryTerm.charAt(index - 1) == QUERY_PARAM_ESCAPE_CHAR) {
+            return indexOfFirstUnescapedChar(queryTerm.substring(index), character);
+        }
+
+        return index;
     }
 
     private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> parseSearchExpression(
@@ -363,7 +395,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
                         .forEach(fieldPath -> searchFieldsPaths.put(StringUtils.isNotBlank(parentClassPath)
                                 ? searchPath + fieldPath.getName() : fieldPath.getName(), searchFieldClass));
             } else {
-                Pair<Class<?>, String> searchField = this.findEntityFieldByPath(clazz, searchPath);
+                Pair<Class<?>, String> searchField = ReflectionHelper.findEntityFieldByPath(clazz, searchPath, true);
                 searchFieldsPaths.put(searchField.getValue(), searchField.getKey());
             }
         }
