@@ -5,16 +5,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({ "pageNumber", "pageSize", "error", "totalItems" })
+@JsonPropertyOrder({ "pageSize", "pageNumber", "totalPages", "totalItems" })
 public class EfdApiMetadata {
 
     @JsonProperty("pageSize")
     private Integer pageSize;
 
-    @JsonProperty("current")
+    @JsonProperty("pageNumber")
     private Integer pageNumber;
 
-    @JsonProperty("pages")
+    @JsonProperty("totalPages")
     private Long totalPages;
 
     @JsonProperty("totalItems")

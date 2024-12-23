@@ -20,7 +20,7 @@ public class RequestBuilder<T>
         this.pageRequest = pageRequest;
     }
 
-    private PageRequest<T> getPageRequest()
+    public PageRequest<T> getPageRequest()
     {
         return pageRequest;
     }
@@ -53,7 +53,12 @@ public class RequestBuilder<T>
     public static <T> RequestBuilder<T> init(Class<T> rootEntity, Integer pageSize, Integer pageNumber)
     {
         PageRequest<T> pageRequest = new PageRequest<>(rootEntity, pageSize, pageNumber);
-        return new RequestBuilder<>(pageRequest);
+        return new RequestBuilder<T>(pageRequest);
+    }
+
+    public static <T> RequestBuilder<T> init(PageRequest<T> pageRequest)
+    {
+        return new RequestBuilder<T>(pageRequest);
     }
 
     /**
