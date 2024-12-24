@@ -8,7 +8,7 @@ public class ConstantsUtil
     public static final String ENTITY_SERVICE_META_VALUES_LEGACY_KEYS = "jpatron.database-service.meta-values.legacy-keys";
 
     //SPECIAL CHARACTERS
-    public static final String COMMA = ",";
+    public static final char COMMA = ',';
 
     //QueryExpression DEFAULTS
     public static final String EQUALS_COMPARATOR = "EQ";
