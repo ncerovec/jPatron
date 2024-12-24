@@ -26,6 +26,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.lang.reflect.Method;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -43,9 +44,14 @@ import java.util.stream.Collectors;
 @Provider
 public class EfdApiRequestFilter implements ContainerRequestFilter {
 
-    private static final String QUERY_PARAM_VALUE_SEPARATOR = ConstantsUtil.COMMA;
-    private static final char QUERY_PARAM_ESCAPE_CHAR = '\\';
-    private static final char QUERY_PARAM_VALUE_QUOTE = '"';
+    private static final String QUERY_VALUE_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
+    private static final char QUERY_VALUE_LEFT_BRACKET = '(';
+    private static final char QUERY_VALUE_RIGHT_BRACKET = ')';
+    private static final char QUERY_VALUE_ESCAPE_CHAR = '\\';
+    private static final char QUERY_VALUE_QUOTE = '"';
+    private static final char FIELD_PATH_CONCATENATOR = '.';
+    private static final String SORT_DESC_SIGN = "-";
+    private static final String SORT_ASC_SIGN = "+";
     private static final Integer DEFAULT_PAGE_NUMBER = 1;
     private static final Integer DEFAULT_PAGE_SIZE = 10;
 
@@ -163,7 +169,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
         Map<String, Map.Entry<Class<?>, QuerySort.Direction>> sort = null;
 
-        LinkedList<String> sortValues = sortExpression.stream().map(s -> s.split(QUERY_PARAM_VALUE_SEPARATOR))
+        LinkedList<String> sortValues = sortExpression.stream().map(s -> s.split(QUERY_VALUE_SEPARATOR))
                 .flatMap(m -> Arrays.stream(m.clone())).collect(Collectors.toCollection(LinkedList::new));
 
         for (String sortPath : sortValues) {
@@ -173,7 +179,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
             }
 
             QuerySort.Direction sortDirection = null;
-            if (sortPath.startsWith("-") || sortPath.startsWith("+")) {
+            if (sortPath.startsWith(SORT_DESC_SIGN) || sortPath.startsWith(SORT_ASC_SIGN)) {
                 sortDirection = QuerySort.Direction.resolveDirectionSign(sortPath.charAt(0));
                 sortPath = sortPath.substring(1);
             }
@@ -211,6 +217,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
             if (!entityFilters.containsKey(fieldPath)) entityFilters.put(fieldPath, new HashSetValuedHashMap<>());
             MultiValuedMap<QueryExpression.CompareOperator, String> filterOps = entityFilters.get(fieldPath);
 
+            values = values.stream().map(String::trim).map(this::removeSurroundingQuotes).toList();
             filterOps.putAll(QueryExpression.CompareOperator.EQ, values);
         }
 
@@ -235,8 +242,8 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
         queryTerm = queryTerm.trim();
 
         // Handle parentheses (sub query term)
-        if (queryTerm.length() > 2 && queryTerm.indexOf('(') == 0) {
-            var subQueryEndIndex = indexOfFirstUnescapedChar(queryTerm, ')');
+        if (queryTerm.length() > 2 && queryTerm.indexOf(QUERY_VALUE_LEFT_BRACKET) == 0) {
+            var subQueryEndIndex = indexOfFirstUnescapedChar(queryTerm, QUERY_VALUE_RIGHT_BRACKET);
             var subExpression = queryTerm.substring(1, subQueryEndIndex);
             queryTerm = queryTerm.substring(subQueryEndIndex + 1);
 
@@ -321,11 +328,10 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
             EfdApiRequest.Comparator cmp = Arrays.stream(EfdApiRequest.Comparator.values())
                     .filter(c -> c.getValue().equals(termMatcher.group(2)))
                     .findAny().orElseThrow();
-            String value = termMatcher.group(3);
+            String value = termMatcher.group(3).trim();
 
             if (cmp == EfdApiRequest.Comparator.IN) {
-                String[] values = Arrays.stream(value.split(QUERY_PARAM_VALUE_SEPARATOR))
-                        .map(String::trim).map(this::removeSurroundingQuotes).toArray(String[]::new);
+                String[] values = this.splitCSValue(value);
                 return new QueryExpression.Filter<>(clazz, fieldPath, cmp.getCompareOperator(), values);
             } else {
                 value = this.removeSurroundingQuotes(value);
@@ -343,10 +349,10 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
         int depth = 0;
         for (int i = 0; i < query.length(); i++) {
-            if (query.charAt(i) == '(' && query.charAt(i - 1) != QUERY_PARAM_ESCAPE_CHAR) {
+            if (query.charAt(i) == QUERY_VALUE_LEFT_BRACKET && query.charAt(i - 1) != QUERY_VALUE_ESCAPE_CHAR) {
                 depth++;
             }
-            if (query.charAt(i) == ')' && query.charAt(i - 1) != QUERY_PARAM_ESCAPE_CHAR) {
+            if (query.charAt(i) == QUERY_VALUE_RIGHT_BRACKET && query.charAt(i - 1) != QUERY_VALUE_ESCAPE_CHAR) {
                 depth--;
             }
 
@@ -362,22 +368,59 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
         return literalIndexes;
     }
 
-    private String removeSurroundingQuotes(String str) {
-        if (str != null && str.length() >= 2
-                && indexOfFirstUnescapedChar(str, QUERY_PARAM_VALUE_QUOTE) == 0
-                && indexOfFirstUnescapedChar(str, QUERY_PARAM_VALUE_QUOTE) == str.length()) {
-            return str.substring(1, str.length() - 1);
-        }
-        return str; // Return the original string if no quotes are present
-    }
-
     private int indexOfFirstUnescapedChar(String queryTerm, char character) {
         int index = queryTerm.indexOf(character);
-        if (index > 0 && queryTerm.charAt(index - 1) == QUERY_PARAM_ESCAPE_CHAR) {
+        if (index > 0 && queryTerm.charAt(index - 1) == QUERY_VALUE_ESCAPE_CHAR) {
             return indexOfFirstUnescapedChar(queryTerm.substring(index), character);
         }
 
         return index;
+    }
+
+    public String[] splitCSValue(String csv) {
+        List<String> result = new ArrayList<>();
+
+        boolean insideQuotes = false;
+        StringBuilder currentField = new StringBuilder();
+
+        for (int i = 0; i < csv.length(); i++) {
+            char c = csv.charAt(i);
+
+            // Check for escaped quotes
+            if (c == QUERY_VALUE_ESCAPE_CHAR && i+1 < csv.length() && csv.charAt(i+1) == QUERY_VALUE_QUOTE) {
+                currentField.append(QUERY_VALUE_QUOTE); // Add the quote to the field
+                i++; // Skip the backslash
+            } else if (c == QUERY_VALUE_QUOTE) {
+                insideQuotes = !insideQuotes;   // Toggle insideQuotes unless it is escaped
+            }
+
+            if (c == ConstantsUtil.COMMA && !insideQuotes) {
+                addValueToCSVList(result, currentField);
+            } else {
+                // Append the character to the current field
+                currentField.append(c);
+            }
+        }
+
+        addValueToCSVList(result, currentField); // Add the last field
+        return result.toArray(new String[0]);
+    }
+
+    private void addValueToCSVList(List<String> resultList, StringBuilder currentField) {
+        String newField = currentField.toString().trim();
+        newField = removeSurroundingQuotes(newField);
+        resultList.add(newField);
+        currentField.setLength(0); // Clear the StringBuilder
+    }
+
+    private String removeSurroundingQuotes(String str) {
+        if (str != null && str.length() >= 2
+                && str.startsWith(String.valueOf(QUERY_VALUE_QUOTE))
+                && str.endsWith(String.valueOf(QUERY_VALUE_QUOTE))) {
+            return str.substring(1, str.length() - 1);
+        }
+
+        return str; // Return the original string if no quotes are present
     }
 
     private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> parseSearchExpression(
@@ -386,7 +429,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
         Map<String, Class<?>> searchFieldsPaths = new HashMap<>();
         for (String searchPath : searchPaths) {
-            if (searchPath.endsWith(".")) {
+            if (searchPath.endsWith(String.valueOf(FIELD_PATH_CONCATENATOR))) {
                 String parentClassPath = searchPath.substring(0, searchPath.length() - 1);
                 Class<?> searchFieldClass = ReflectionHelper.findFieldByPath(clazz, parentClassPath)
                         .map(f -> (Class) f.getType()).orElse(clazz);

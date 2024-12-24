@@ -48,7 +48,7 @@ public interface EntityService<E>
 {
     Logger logger = Logger.getLogger(EntityService.class.getName());
 
-    String LABEL_PATHS_SEPARATOR = ConstantsUtil.COMMA;
+    String LABEL_PATHS_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
 
     List<QueryExpression.CompareOperator> booleanComparators = Arrays.asList(QueryExpression.CompareOperator.TRUE, QueryExpression.CompareOperator.FALSE);
     List<QueryExpression.CompareOperator> subqueryComparators = Arrays.asList(QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NotEACH, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.NotEXCEPT);
