@@ -9,9 +9,11 @@ import info.nino.jpatron.request.ApiRequest;
 import info.nino.jpatron.request.QueryExpression;
 import info.nino.jpatron.request.QuerySort;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.container.ResourceInfo;
@@ -42,6 +44,7 @@ import java.util.stream.Collectors;
  */
 @EfdApi
 @Provider
+@Priority(Priorities.USER + 1)
 public class EfdApiRequestFilter implements ContainerRequestFilter {
 
     private static final String QUERY_VALUE_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
