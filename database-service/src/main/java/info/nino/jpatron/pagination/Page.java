@@ -1,6 +1,6 @@
 package info.nino.jpatron.pagination;
 
-import info.nino.jpatron.metamodel.PageRequest;
+import info.nino.jpatron.query.PageRequest;
 import info.nino.jpatron.response.ApiPageResponse;
 
 import java.util.List;
@@ -15,7 +15,7 @@ public class Page<T> extends ApiPageResponse<T>
      * @param totalElements total number of target entity objects in datasource (by filters)
      * @param content result list of the target entity objects (size of page-size)
      */
-    public Page(PageRequest pageRequest, long totalElements, List<T> content)
+    public Page(PageRequest<T> pageRequest, long totalElements, List<T> content)
     {
         super(pageRequest.getPageNumber(), pageRequest.getPageSize(), totalElements, content);
     }

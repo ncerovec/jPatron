@@ -4,7 +4,7 @@ import com.google.common.collect.Sets;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.DateTimeFormatUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
-import info.nino.jpatron.metamodel.PageRequest;
+import info.nino.jpatron.query.PageRequest;
 import info.nino.jpatron.pagination.Page;
 import info.nino.jpatron.request.QueryExpression;
 import info.nino.jpatron.request.QuerySort;
@@ -126,7 +126,7 @@ public interface EntityService<E>
      * @param request (PageRequest) with query parameters (filters, pagination, sorting, etc...)
      * @return Page object with list of target Entity objects from DB
      */
-    default Page<E> dataQuery(PageRequest request)
+    default Page<E> dataQuery(PageRequest<E> request)
     {
         Class<E> entity = this.getEntityClass();
         EntityManager em = this.getBaseInstance().resolveEntityManager();
@@ -139,7 +139,7 @@ public interface EntityService<E>
      * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
      * @return Map (requested properties) of Maps (distinct-values &amp; their keys/counterparts) containing distinct-values of requested properties
      */
-    default Map<String, Map<Object, Object>> distinctQuery(PageRequest request)
+    default Map<String, Map<Object, Object>> distinctQuery(PageRequest<E> request)
     {
         Class<E> entity = this.getEntityClass();
         EntityManager em = this.getBaseInstance().resolveEntityManager();
@@ -170,7 +170,7 @@ public interface EntityService<E>
      * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
      * @return Map (requested properties) of Maps (distinct-values &amp; their keys/counterparts) containing distinct-values of requested properties
      */
-    default Map<String, Map<Object, Object>> metaQuery(PageRequest request)
+    default Map<String, Map<Object, Object>> metaQuery(PageRequest<E> request)
     {
         Class<E> entity = this.getEntityClass();
         EntityManager em = this.getBaseInstance().resolveEntityManager();
@@ -367,7 +367,7 @@ public interface EntityService<E>
 
             query.select(root); //query.select(cb.tuple(root));
 
-            if(request.getSorts() != null)
+            if(request.getSorts() != null && !request.getSorts().isEmpty())
             {
                 List<Order> orders = this.getSorting(cb, query, entity, request.getSorts());
                 query.orderBy(orders.toArray(new Order[]{}));
