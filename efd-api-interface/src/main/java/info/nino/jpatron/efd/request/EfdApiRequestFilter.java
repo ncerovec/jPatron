@@ -178,7 +178,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
                 continue;
             }
 
-            QuerySort.Direction sortDirection = null;
+            QuerySort.Direction sortDirection = QuerySort.Direction.ASC;
             if (sortPath.startsWith(SORT_DESC_SIGN) || sortPath.startsWith(SORT_ASC_SIGN)) {
                 sortDirection = QuerySort.Direction.resolveDirectionSign(sortPath.charAt(0));
                 sortPath = sortPath.substring(1);
