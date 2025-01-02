@@ -43,7 +43,7 @@ public class QueryExpression {
         this.labelColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, labelColumnPath, true);
     }
 
-    public QueryExpression(Class<?> rootEntity, String name, String valueColumnPath, String labelColumnPath) {
+    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, String labelColumnPath) {
         this.rootEntity = rootEntity;
         this.name = name;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
@@ -210,6 +210,10 @@ public class QueryExpression {
             }
 
             CollectionUtils.addAll(this.compoundFilters, compoundFilters);
+        }
+
+        public boolean isEmpty() {
+            return (this.filters == null || this.filters.isEmpty()) && (this.compoundFilters == null || this.compoundFilters.isEmpty());
         }
 
         @Override
