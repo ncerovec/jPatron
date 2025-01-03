@@ -245,8 +245,10 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
         queryTerm = queryTerm.trim();
 
         // Handle parentheses (sub query term)
-        if (queryTerm.length() > 2 && queryTerm.indexOf(QUERY_VALUE_LEFT_BRACKET) == 0) {
-            var subQueryEndIndex = indexOfFirstUnescapedChar(queryTerm, QUERY_VALUE_RIGHT_BRACKET);
+        if (queryTerm.length() > 2
+                && queryTerm.indexOf(QUERY_VALUE_LEFT_BRACKET) == 0
+                && indexOfFirstUnescapedChar(queryTerm, QUERY_VALUE_RIGHT_BRACKET) == queryTerm.length() - 1) {
+            var subQueryEndIndex = queryTerm.length() - 1;
             var subExpression = queryTerm.substring(1, subQueryEndIndex);
             queryTerm = queryTerm.substring(subQueryEndIndex + 1);
 
@@ -352,10 +354,10 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
         int depth = 0;
         for (int i = 0; i < query.length(); i++) {
-            if (query.charAt(i) == QUERY_VALUE_LEFT_BRACKET && query.charAt(i - 1) != QUERY_VALUE_ESCAPE_CHAR) {
+            if (query.charAt(i) == QUERY_VALUE_LEFT_BRACKET && query.charAt(Math.abs(i - 1)) != QUERY_VALUE_ESCAPE_CHAR) {
                 depth++;
             }
-            if (query.charAt(i) == QUERY_VALUE_RIGHT_BRACKET && query.charAt(i - 1) != QUERY_VALUE_ESCAPE_CHAR) {
+            if (query.charAt(i) == QUERY_VALUE_RIGHT_BRACKET && query.charAt(Math.abs(i - 1)) != QUERY_VALUE_ESCAPE_CHAR) {
                 depth--;
             }
 
