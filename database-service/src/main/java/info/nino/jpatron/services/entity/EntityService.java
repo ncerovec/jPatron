@@ -1973,23 +1973,11 @@ public interface EntityService<E>
 
             if(key == null) //generate metaValue KEY
             {
-                String legacyKeyConfigString = System.getProperty(ConstantsUtil.ENTITY_SERVICE_META_VALUES_LEGACY_KEYS, BooleanUtils.FALSE);
-                if(BooleanUtils.toBoolean(legacyKeyConfigString))
-                {
-                    key = metaQuery.getValueColumnEntityPath().getKey().getSimpleName();
-                    if(metaQuery.getValueColumnEntityPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(metaQuery.getValueColumnEntityPath().getValue());
-                    if(metaQuery.getLabelColumnEntityPath() != null) key += " by " + metaQuery.getLabelColumnEntityPath().getValue().replaceAll(EntityService.LABEL_PATHS_SEPARATOR, " and ");
-                    if(metaQuery.getFunc() != null) key += " " + StringUtils.lowerCase(metaQuery.getFunc().name());
-                    if(metaQuery.getFilters() != null) for(QueryExpression.Filter f : metaQuery.getFilters()) key += " " + f.getName();
-                }
-                else
-                {
-                    key = metaQuery.getValueColumnEntityPath().getKey().getSimpleName();
-                    if(metaQuery.getFunc() != null) key += " " + StringUtils.lowerCase(metaQuery.getFunc().name());
-                    if(metaQuery.getValueColumnEntityPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(metaQuery.getValueColumnEntityPath().getValue());
-                    if(metaQuery.getLabelColumnEntityPath() != null) key += " by " + metaQuery.getLabelColumnEntityPath().getValue().replaceAll(EntityService.LABEL_PATHS_SEPARATOR, " and ");
-                    if(metaQuery.getFilters() != null) for(QueryExpression.Filter f : metaQuery.getFilters()) key += " " + f.getName();
-                }
+                key = metaQuery.getValueColumnEntityPath().getKey().getSimpleName();
+                if(metaQuery.getFunc() != null) key += " " + StringUtils.lowerCase(metaQuery.getFunc().name());
+                if(metaQuery.getValueColumnEntityPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(metaQuery.getValueColumnEntityPath().getValue());
+                if(metaQuery.getLabelColumnEntityPath() != null) key += " by " + metaQuery.getLabelColumnEntityPath().getValue().replaceAll(EntityService.LABEL_PATHS_SEPARATOR, " and ");
+                if(metaQuery.getFilters() != null) for(QueryExpression.Filter f : metaQuery.getFilters()) key += " " + f.getName();
 
                 key = WordUtils.capitalize(key.replaceAll("[\\._]", " "));
                 key = StringUtils.uncapitalize(StringUtils.deleteWhitespace(key));
