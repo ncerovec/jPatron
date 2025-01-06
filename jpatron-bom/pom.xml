@@ -35,19 +35,19 @@
 
             <dependency>
                 <groupId>info.nino.jpatron</groupId>
-                <artifactId>jsonapi-interface</artifactId>
+                <artifactId>jpatron-api-interface</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>info.nino.jpatron</groupId>
+                <artifactId>json-api-interface</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>info.nino.jpatron</groupId>
                 <artifactId>efd-api-interface</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>info.nino.jpatron</groupId>
-                <artifactId>jpatron-api-interface</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>

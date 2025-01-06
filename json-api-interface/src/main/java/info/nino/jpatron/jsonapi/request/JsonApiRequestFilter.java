@@ -47,9 +47,9 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
 {
     private static final Logger logger = Logger.getLogger(JsonApiRequestFilter.class.getName());
 
-    private static final String DEFAULT_FILTER_COMPARATOR = ConstantsUtil.EQUALS_COMPARATOR;
-    private static final String DEFAULT_SEARCH_MODIFIER = ConstantsUtil.LIKELR_SEARCH_MODIFIER;
-    private static final String DEFAULT_META_FUNCTION = ConstantsUtil.COUNT_META_FUNCTION;
+    private static final String DEFAULT_FILTER_COMPARATOR = QueryExpression.CompareOperator.EQ.name();
+    private static final String DEFAULT_SEARCH_MODIFIER = QueryExpression.ValueModifier.LikeLR.name();
+    private static final String DEFAULT_META_FUNCTION = QueryExpression.Function.COUNT.name();
     private static final String QUERY_PARAM_VALUE_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
     private static final Integer DEFAULT_PAGE_NUMBER = 1;
     private static final Integer DEFAULT_PAGE_SIZE = 10;

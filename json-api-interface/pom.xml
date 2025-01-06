@@ -7,10 +7,10 @@
         <artifactId>jpatron</artifactId>
         <version>3.0.0-SNAPSHOT</version>
     </parent>
-    <artifactId>jsonapi-interface</artifactId>
+    <artifactId>json-api-interface</artifactId>
 
     <name>${project.parent.groupId}:${project.artifactId}</name>
-    <description>jPatron - jsonapi-interface module</description>
+    <description>jPatron - json-api-interface module</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>

@@ -1,4 +1,4 @@
-package info.nino.jpatron.api.complex;
+package info.nino.jpatron.jsonapi.complex;
 
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -7,9 +7,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "id", "code", "title", "detail" })
-public
-class JPatronApiError
-{
+public class JsonApiError {
+
     @JsonProperty("id")
     private String id;
 
@@ -22,15 +21,18 @@ class JPatronApiError
     @JsonProperty("detail")
     private String detail;
 
-    public JPatronApiError() {}
-    public JPatronApiError(String title) {
+    public JsonApiError() {}
+
+    public JsonApiError(String title) {
         this.title = title;
     }
-    public JPatronApiError(String id, String code, String title) {
+
+    public JsonApiError(String id, String code, String title) {
         this.id = id;
         this.code = code;
         this.title = title;
     }
+
     public String getId() {
         return id;
     }

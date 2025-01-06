@@ -16,7 +16,7 @@
         <module>jpatron-bom</module>
         <module>common-utils</module>
         <module>database-service</module>
-        <module>jsonapi-interface</module>
+        <module>json-api-interface</module>
         <module>efd-api-interface</module>
         <module>jpatron-api-interface</module>
     </modules>

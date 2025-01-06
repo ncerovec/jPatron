@@ -15,14 +15,14 @@ import java.util.List;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({"error", "type", "data", "meta"})
-public class JsonApiResponseList<T> extends JsonApiResponse<List<T>> implements JsonResponseInterface
-{
+public class JsonApiListResponse<T> extends JsonApiResponse<List<T>> implements JsonResponseInterface {
+
     @JsonProperty("data")
     private List<Data<T>> data;
 
-    public JsonApiResponseList(){}
+    public JsonApiListResponse(){}
 
-    public JsonApiResponseList(ApiPageResponse<T> page)
+    public JsonApiListResponse(ApiPageResponse<T> page)
     {
         this.setListData(page.getContent());
 
@@ -33,7 +33,7 @@ public class JsonApiResponseList<T> extends JsonApiResponse<List<T>> implements 
         if(page.getMetaValues() != null) this.getMeta().put("metaValues", page.getMetaValues());
     }
 
-    public JsonApiResponseList(T... o) {
+    public JsonApiListResponse(T... o) {
         super();
         List<Data<T>> data = new ArrayList<>(o.length);
         for (T t : o) {
@@ -43,7 +43,7 @@ public class JsonApiResponseList<T> extends JsonApiResponse<List<T>> implements 
         this.data = data;
     }
 
-    public JsonApiResponseList(List<T> o) {
+    public JsonApiListResponse(List<T> o) {
         super();
         setListData(o);
     }

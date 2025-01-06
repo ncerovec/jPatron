@@ -22,7 +22,7 @@
 </dependency>
 ```
 
-## [JSON-API Interface - Documentation](./jsonapi-interface/README.md)
+## [JSON-API Interface - Documentation](./json-api-interface/README.md)
 - Library implements JSON:API REST interface for RestEasy resources (endpoints)
 - Hooks onto jPatron database-service which enables JSON:API requests similar to GraphQL
 - Provides custom filtering & searching options using HTTP Query Parameters
@@ -31,7 +31,7 @@
 ```xml
 <dependency>
   <groupId>info.nino.jpatron</groupId>
-  <artifactId>jsonapi-interface</artifactId>
+  <artifactId>json-api-interface</artifactId>
   <version>${jpatron.version}</version>
 </dependency>
 ```
