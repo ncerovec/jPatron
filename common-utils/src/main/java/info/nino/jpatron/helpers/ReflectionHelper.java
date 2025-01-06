@@ -9,22 +9,14 @@ import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.GenericDeclaration;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.lang.reflect.*;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ReflectionHelper {
+
+    private static Logger logger = Logger.getLogger(ReflectionHelper.class.getName());
 
     public static final String PATH_SEPARATOR = "."; //PATH_DELIMITER
     private static final List<String> ENTITY_ANNOTATION_CLASSES = Arrays.asList("jakarta.persistence.Entity", "jakarta.persistence.Embeddable");
@@ -338,53 +330,75 @@ public class ReflectionHelper {
     }
     */
 
-    @SuppressWarnings("unchecked")  //TODO: verify this method (might have bugzzz)
-    public static <T> Class<T> getGenericClassParameter(final Class<?> parameterizedSubClass, final Class<?> genericSuperClass, final int pos)
+    public static <T> Class<T> findGenericClassParameterType(final Class<?> parameterizedClass, final Class<?> genericSuperClass, final int pos)
     {
-        //Mapping from type variables to actual values (classes)
-        Map<TypeVariable<?>, Class<?>> mapping = new HashMap<>();
+        if (parameterizedClass == null) {
+            throw new IllegalArgumentException("Invalid invocation with NULL 'parameterizedClass' parameter!");
+        }
 
-        Class<?> clazz = parameterizedSubClass;
-        while(clazz != null)
-        {
-            ArrayList<Type> types = new ArrayList(Arrays.asList(clazz.getGenericInterfaces()));
-            types.add(clazz.getGenericSuperclass());
+        if (genericSuperClass == null) {
+            throw new IllegalArgumentException("Invalid invocation with NULL 'genericSuperClass' parameter!");
+        }
 
-            for(Type type : types)
-            {
-                if(type instanceof ParameterizedType)
+        Class<T> parameterType = ReflectionHelper.findGenericTypeParameterType(parameterizedClass, genericSuperClass, pos, new LinkedHashMap<>(), -1);
+
+        if (parameterType == null) {
+            throw new IllegalStateException(String.format("Parameter [%d] type of generic supertype '%s' from '%s' class NOT FOUND!", pos, genericSuperClass.getSimpleName(), parameterizedClass.getTypeName()));
+        }
+
+        return parameterType;
+    }
+
+    private static <T> Class<T> findGenericTypeParameterType(final Class<?> parameterizedClass, final Class<?> genericSuperClass, final int pos, Map<TypeVariable<?>, Class<?>> typeMapping, int recursionLevel)
+    {
+        recursionLevel++;
+
+        Class<T> parameterType = null;
+        logger.log(Level.FINE, String.format("Currently resolving parameter [%d] type of '%s' in '%s' class (recursion level: %d)...", pos, genericSuperClass.getSimpleName(), parameterizedClass.getTypeName(), recursionLevel));
+
+        ArrayList<Type> nextTypes = new ArrayList<>(Arrays.asList(parameterizedClass.getGenericInterfaces()));
+        nextTypes.add(parameterizedClass.getGenericSuperclass());
+        //Class<?> nextClass = parameterizedClass.getSuperclass();    //NOTICE: was only superclass implementation
+        //Type genericType = parameterizedClass.getGenericSuperclass();
+        //Class<?> nextClass = (genericType instanceof Class<?>) ? (Class<?>) genericType : parameterizedClass.getSuperclass();
+        //nextTypes.add(nextClass);
+
+        for (Type type : nextTypes) {
+            if (type instanceof ParameterizedType parType) {
+                //resolve mapping from type variables to actual values (classes)
+                Type[] vars = ((GenericDeclaration) (parType.getRawType())).getTypeParameters();
+                Type[] args = parType.getActualTypeArguments();
+                for(int i = 0; i < vars.length; i++)
                 {
-                    ParameterizedType parType = (ParameterizedType) type;
-                    Type rawType = parType.getRawType();
-
-                    if(rawType == genericSuperClass)
-                    {
-                        //found
-                        Type t = parType.getActualTypeArguments()[pos];
-                        if(t instanceof Class<?>) return (Class<T>) t;
-                        else return (Class<T>) mapping.get((TypeVariable<?>) t);
-                    }
-
-                    //resolve
-                    Type[] vars = ((GenericDeclaration) (parType.getRawType())).getTypeParameters();
-                    Type[] args = parType.getActualTypeArguments();
-                    for(int i = 0; i < vars.length; i++)
-                    {
-                        if(args[i] instanceof Class<?>) mapping.put((TypeVariable) vars[i], (Class<?>) args[i]);
-                        else mapping.put((TypeVariable) vars[i], mapping.get((TypeVariable<?>) (args[i])));
-                    }
-
-                    clazz = (Class<?>) rawType;
+                    if(args[i] instanceof Class<?>) typeMapping.put((TypeVariable) vars[i], (Class<?>) args[i]);
+                    else typeMapping.put((TypeVariable) vars[i], typeMapping.get((TypeVariable<?>) (args[i])));
                 }
-                else
-                {
-                    //clazz = clazz.getSuperclass();    //NOTICE: was only superclass implementation
-                    Type genericType = clazz.getGenericSuperclass();
-                    clazz = (genericType instanceof  Class<?>) ? (Class<?>) genericType : clazz.getSuperclass();
+
+                Type rawType = parType.getRawType();
+                if (rawType == genericSuperClass) {
+                    //found
+                    Type t = parType.getActualTypeArguments()[pos];
+                    parameterType = (t instanceof Class<?>) ? (Class<T>) t : (Class<T>) typeMapping.get((TypeVariable<?>) t);
+                }
+            }
+
+            if (parameterType == null) {
+                Class<?> nextType = null;
+                if (type instanceof ParameterizedType parType) {
+                    nextType = (Class<?>) parType.getRawType();
+                } else if (type instanceof Class) {
+                    nextType = (Class<?>) type;
+                }
+
+                if (nextType != null && nextType != Object.class) {
+                    parameterType = ReflectionHelper.findGenericTypeParameterType(nextType, genericSuperClass, pos, typeMapping, recursionLevel);
+                    if (parameterType != null) {
+                        break;
+                    }
                 }
             }
         }
 
-        throw new IllegalStateException(String.format("Generic supertype %s for %s class NOT FOUND!", genericSuperClass.getSimpleName(), parameterizedSubClass.getSimpleName()));
+        return parameterType;
     }
 }
