@@ -24,7 +24,7 @@ public class EfdApiResponseFilter implements ContainerResponseFilter {
 	public void filter(ContainerRequestContext requestContext, ContainerResponseContext responseContext) {
 		if ((ri.getResourceClass().isAnnotationPresent(EfdApi.class) || ri.getResourceMethod().isAnnotationPresent(EfdApi.class))) {
 			if (responseContext.getStatusInfo().getFamily() == Response.Status.Family.SUCCESSFUL) {
-				if (responseContext.getEntity() instanceof EfdApiResponseList) {
+				if (responseContext.getEntity() instanceof EfdApiListResponse) {
 					responseContext.setEntity(responseContext.getEntity(),
 							responseContext.getEntityAnnotations(),
 							MediaType.valueOf(MediaType.APPLICATION_JSON));
