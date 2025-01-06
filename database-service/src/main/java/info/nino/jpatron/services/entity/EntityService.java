@@ -217,9 +217,9 @@ public interface EntityService<E>
 
             try
             {
-                type = ReflectionHelper.getGenericClassParameter((Class<?>) es.getClass().getGenericSuperclass(), EntityService.class, 0);
+                type = ReflectionHelper.findGenericClassParameterType(es.getClass(), EntityService.class, 0);
             }
-            catch(RuntimeException ex)
+            catch(RuntimeException ex)  //TODO: remove fallback after verifying new findGenericClassParameter is wholesome!
             {
                 if(es.isLoggingEnabled()) logger.log(Level.WARNING, String.format("EntityClass not resolved by EntityService superclass (fallback to manual resolver): %s", ex.getMessage()));
 
@@ -2148,7 +2148,7 @@ public interface EntityService<E>
 
             try
             {
-                dataType = ReflectionHelper.getGenericClassParameter(this.getClass(), AttributeMapper.class, 0);
+                dataType = ReflectionHelper.findGenericClassParameterType(this.getClass(), AttributeMapper.class, 0);
             }
             catch(RuntimeException ex)
             {
@@ -2164,7 +2164,7 @@ public interface EntityService<E>
 
             try
             {
-                dataType = ReflectionHelper.getGenericClassParameter(this.getClass(), AttributeMapper.class, 1);
+                dataType = ReflectionHelper.findGenericClassParameterType(this.getClass(), AttributeMapper.class, 1);
             }
             catch(RuntimeException ex)
             {

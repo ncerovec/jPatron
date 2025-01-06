@@ -4,6 +4,7 @@ import info.nino.jpatron.request.QueryExpression;
 import info.nino.jpatron.request.QuerySort;
 
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -50,7 +51,7 @@ public class PageRequest<T>
     /**
      * Set of sorting parameters of QuerySort type
      */
-    private Set<QuerySort> sorts = new HashSet<>();
+    private Set<QuerySort> sorts = new LinkedHashSet<>();
 
     /**
      * EntityService query-filters

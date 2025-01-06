@@ -78,6 +78,9 @@
         <jakarta-jpa.version>3.1.0</jakarta-jpa.version>
         <hibernate.version>6.2.4.Final</hibernate.version>
         <jackson.version>2.15.0</jackson.version>
+        <!-- common test-dependencies versions -->
+        <junit.version>5.11.0</junit.version>
+        <assertj.version>3.26.3</assertj.version>
     </properties>
 
     <dependencyManagement>
@@ -170,6 +173,22 @@
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
                 <version>${google.guava.version}</version>
+            </dependency>
+
+            <!-- TEST -->
+
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-core</artifactId>
+                <version>${assertj.version}</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
