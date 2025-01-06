@@ -44,6 +44,12 @@
                 <artifactId>efd-api-interface</artifactId>
                 <version>${project.version}</version>
             </dependency>
+
+            <dependency>
+                <groupId>info.nino.jpatron</groupId>
+                <artifactId>jpatron-api-interface</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 </project>

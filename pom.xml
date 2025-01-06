@@ -18,6 +18,7 @@
         <module>database-service</module>
         <module>jsonapi-interface</module>
         <module>efd-api-interface</module>
+        <module>jpatron-api-interface</module>
     </modules>
 
     <developers>

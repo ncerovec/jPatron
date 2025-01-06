@@ -8,8 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 @JsonPropertyOrder({"data", "metadata"})
-public class EfdApiResponseList<T> implements EfdResponseInterface
-{
+public class EfdApiResponseList<T> implements EfdResponseInterface {
+
     @JsonProperty("data")
     private List<T> data;
 
@@ -17,23 +17,26 @@ public class EfdApiResponseList<T> implements EfdResponseInterface
     private EfdApiMetadata metadata;
 
     public EfdApiResponseList() {
+
     }
 
-    public EfdApiResponseList(T... o) {
-        this.data = new ArrayList<>(List.of(o));
+    public EfdApiResponseList(T... data) {
+        List<T> dataList = List.of(data);
+        this.data = new ArrayList<>(dataList);
+        this.metadata = new EfdApiMetadata(null, dataList.size(), null, null);
     }
 
-    public EfdApiResponseList(List<T> o) {
-        this.data = o;
+    public EfdApiResponseList(List<T> data) {
+        this.data = data;
+        this.metadata = new EfdApiMetadata(null, data.size(), null, null);
     }
 
-    public EfdApiResponseList(ApiPageResponse<T> page)
-    {
-        this.setData(page.getContent());
-        this.setMetadata(new EfdApiMetadata(page.getPageNumber(),
+    public EfdApiResponseList(ApiPageResponse<T> page) {
+        this.data = page.getContent();
+        this.metadata = new EfdApiMetadata(page.getPageNumber(),
                                             page.getPageSize(),
                                             page.getTotalPages(),
-                                            page.getTotalItems()));
+                                            page.getTotalItems());
     }
 
     public List<T> getData() {
