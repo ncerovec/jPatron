@@ -1,11 +1,12 @@
 package info.nino.jpatron.services.entity;
 
+import com.github.sisyphsu.dateparser.DateParserUtils;
 import com.google.common.collect.Sets;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.DateTimeFormatUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
-import info.nino.jpatron.query.PageRequest;
 import info.nino.jpatron.pagination.Page;
+import info.nino.jpatron.query.PageRequest;
 import info.nino.jpatron.request.QueryExpression;
 import info.nino.jpatron.request.QuerySort;
 import jakarta.persistence.*;
@@ -14,7 +15,6 @@ import jakarta.persistence.metamodel.Attribute;
 import jakarta.persistence.metamodel.Bindable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -30,6 +30,9 @@ import org.hibernate.query.sqm.tree.select.SqmSelectStatement;
 
 import java.lang.reflect.*;
 import java.math.BigDecimal;
+import java.time.Year;
+import java.time.YearMonth;
+import java.time.temporal.Temporal;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -339,7 +342,7 @@ public interface EntityService<E>
             return (Long) countTuple.get(0).get(0);
         }
 
-        private Page<E> dataQuery(EntityManager em, Class<E> entity, PageRequest request)
+        private Page<E> dataQuery(EntityManager em, Class<E> entity, PageRequest<E> request)
         {
             CriteriaBuilder cb = em.getCriteriaBuilder();
             CriteriaQuery<E> query = Core.createEntityQuery(cb, entity);
@@ -396,7 +399,7 @@ public interface EntityService<E>
             return page;
         }
 
-        private Page<E> pageQuery(EntityManager em, CriteriaQuery<E> query, Class<E> entity, PageRequest request)
+        private Page<E> pageQuery(EntityManager em, CriteriaQuery<E> query, Class<E> entity, PageRequest<E> request)
         {
             TypedQuery<E> dataQuery = em.createQuery(query);
             //TypedQuery<Tuple> dataQuery = em.createQuery(query);
@@ -2068,10 +2071,22 @@ public interface EntityService<E>
                             .filter(e -> ((Enum) e).name().equalsIgnoreCase(value)).findAny()
                             .orElseGet(() -> Enum.valueOf(clazz, value));
                 }
-                if(Date.class.isAssignableFrom(clazz))
+                if (Date.class.isAssignableFrom(clazz)
+                    || Calendar.class.isAssignableFrom(clazz)
+                    || ( //Instant, LocalTime, OffsetTime, LocalDate, LocalDateTime, OffsetDateTime, ZonedDateTime
+                            Temporal.class.isAssignableFrom(clazz)
+                            && !Year.class.isAssignableFrom(clazz)
+                            && !YearMonth.class.isAssignableFrom(clazz)
+                    ))
                 {
-                    Date dateValue = DateTimeFormatUtil.parseDateTimeISO8601(value);
-                    return (dateValue != null) ? dateValue : value;
+                    String dateFormatPattern = System.getProperty(ConstantsUtil.ENTITY_SERVICE_DATE_FORMAT_PATTERN, DateTimeFormatUtil.TIMESTAMP_PATTERN_ISO8601);
+                    Date dateValue = DateTimeFormatUtil.parseDateTime(dateFormatPattern, value);
+                    if (dateValue != null) {
+                        return dateValue;
+                    } else {
+                        Date wildcardDate = DateParserUtils.parseDate(value);
+                        return (wildcardDate != null) ? wildcardDate : value;
+                    }
                 }
             }
             catch(Exception ex)

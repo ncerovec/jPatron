@@ -49,5 +49,10 @@
             <artifactId>hibernate-core</artifactId>
             <scope>provided</scope>
         </dependency>
+
+        <dependency>
+            <groupId>com.github.sisyphsu</groupId>
+            <artifactId>dateparser</artifactId>
+        </dependency>
     </dependencies>
 </project>

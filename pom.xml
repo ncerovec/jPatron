@@ -81,6 +81,7 @@
         <!-- common test-dependencies versions -->
         <junit.version>5.11.0</junit.version>
         <assertj.version>3.26.3</assertj.version>
+        <dateparser.version>1.0.11</dateparser.version>
     </properties>
 
     <dependencyManagement>
@@ -173,6 +174,12 @@
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
                 <version>${google.guava.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.sisyphsu</groupId>
+                <artifactId>dateparser</artifactId>
+                <version>${dateparser.version}</version>
             </dependency>
 
             <!-- TEST -->
