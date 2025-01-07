@@ -15,7 +15,7 @@ import java.util.List;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({"error", "type", "data", "meta"})
-public class JsonApiListResponse<T> extends JsonApiResponse<List<T>> implements JsonResponseInterface {
+public class JsonApiListResponse<T> extends JsonApiResponse<List<T>> {
 
     @JsonProperty("data")
     private List<Data<T>> data;

@@ -5,12 +5,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import info.nino.jpatron.jsonapi.complex.Data;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "data"})
-public class JsonApiRequestPayloadList<T> implements java.io.Serializable {
+public class JsonApiRequestPayloadList<T> implements Serializable {
 
     @JsonProperty("data")
     protected List<Data<T>> data;

@@ -6,22 +6,25 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import info.nino.jpatron.jsonapi.complex.JsonApiError;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "errors" })
 public class JsonApiErrorResponse implements JsonResponseInterface {
 
     @JsonProperty("errors")
-    private JsonApiError errors;
+    private List<JsonApiError> errors = new ArrayList<>();
 
     public JsonApiErrorResponse() {
-        this.errors = new JsonApiError();
+
     }
 
-    public JsonApiError getErrors() {
+    public List<JsonApiError> getErrors() {
         return errors;
     }
 
-    public void setErrors(JsonApiError errors) {
+    public void setErrors(List<JsonApiError> errors) {
         this.errors = errors;
     }
 }

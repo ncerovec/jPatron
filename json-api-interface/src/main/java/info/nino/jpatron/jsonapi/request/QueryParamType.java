@@ -1,7 +1,7 @@
 package info.nino.jpatron.jsonapi.request;
 
-public enum QueryParamType
-{
+public enum QueryParamType {
+
     PAGE("page"),
     PAGE_SIZE("page[size]"),
     PAGE_NUMBER("page[number]"),

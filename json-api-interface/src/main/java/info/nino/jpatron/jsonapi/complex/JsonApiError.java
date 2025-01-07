@@ -6,11 +6,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({ "id", "code", "title", "detail" })
+@JsonPropertyOrder({ "id", "status", "code", "title", "detail" })
 public class JsonApiError {
 
     @JsonProperty("id")
     private String id;
+
+    @JsonProperty("status")
+    private String status;
 
     @JsonProperty("code")
     private String code;
@@ -39,6 +42,14 @@ public class JsonApiError {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public String getCode() {

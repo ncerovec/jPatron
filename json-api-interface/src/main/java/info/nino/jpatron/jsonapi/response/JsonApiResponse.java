@@ -16,7 +16,7 @@ import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({"error", "data", "type", "meta"})
-public class JsonApiResponse<T> implements JsonResponseInterface, java.io.Serializable
+public class JsonApiResponse<T> implements JsonResponseInterface
 {
     @JsonProperty("errors")
     protected List<JsonApiError> errors;

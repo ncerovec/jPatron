@@ -5,9 +5,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import info.nino.jpatron.jsonapi.complex.Data;
 
+import java.io.Serializable;
+
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({ "data"})
-public class JsonApiRequestPayload<T> implements java.io.Serializable {
+public class JsonApiRequestPayload<T> implements Serializable {
 
     @JsonProperty("data")
     protected Data<T> data;

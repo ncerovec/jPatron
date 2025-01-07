@@ -1,10 +1,10 @@
 package info.nino.jpatron.jsonapi.request;
 
-import info.nino.jpatron.jsonapi.annotiation.JsonApi;
-import info.nino.jpatron.jsonapi.annotiation.JsonApiInject;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.helpers.RegexHelper;
+import info.nino.jpatron.jsonapi.annotiation.JsonApi;
+import info.nino.jpatron.jsonapi.annotiation.JsonApiInject;
 import info.nino.jpatron.request.QueryExpression;
 import info.nino.jpatron.request.QuerySort;
 import jakarta.annotation.PostConstruct;
@@ -30,7 +30,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -43,9 +42,7 @@ import java.util.stream.Collectors;
 //@PreMatching
 //@RequestScoped
 //@Priority(Priorities.HEADER_DECORATOR + 200)
-public class JsonApiRequestFilter implements ContainerRequestFilter    //, RequestContext
-{
-    private static final Logger logger = Logger.getLogger(JsonApiRequestFilter.class.getName());
+public class JsonApiRequestFilter implements ContainerRequestFilter {   //, RequestContext
 
     private static final String DEFAULT_FILTER_COMPARATOR = QueryExpression.CompareOperator.EQ.name();
     private static final String DEFAULT_SEARCH_MODIFIER = QueryExpression.ValueModifier.LikeLR.name();
