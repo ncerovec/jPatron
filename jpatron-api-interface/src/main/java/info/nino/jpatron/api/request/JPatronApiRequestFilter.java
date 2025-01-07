@@ -51,6 +51,8 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
     private static final char FIELD_PATH_CONCATENATOR = '.';
     private static final String SORT_DESC_SIGN = "-";
     private static final String SORT_ASC_SIGN = "+";
+    private static final String QUERY_PROPERTY_PAGE_SIZE = "size";
+    private static final String QUERY_PROPERTY_PAGE_NUMBER = "number";
 
     private static final Integer DEFAULT_PAGE_NUMBER = 1;
     private static final Integer DEFAULT_PAGE_SIZE = 10;
@@ -139,15 +141,15 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                 // Page query params
                 case PAGE: {
                     if (!valueIsPresent || value.size() != 1 || !value.get(0).matches("\\d+")) {
-                        throw new IllegalArgumentException(String.format("Invalid value '%s' for '%s' query parameter!", value, key));
+                        throw new IllegalArgumentException(String.format("Invalid value '%s' in '%s' query parameter!", value, key));
                     }
 
-                    if(("size").equals(property)) {
+                    if((QUERY_PROPERTY_PAGE_SIZE).equals(property)) {
                         requestQueryParams.setPageSize(Integer.parseInt(value.get(0)));
-                    } else if(("number").equals(property)) {
+                    } else if((QUERY_PROPERTY_PAGE_NUMBER).equals(property)) {
                         requestQueryParams.setPageNumber(Integer.parseInt(value.get(0)));
                     } else {
-                        throw new IllegalArgumentException(String.format("Invalid '%s' query parameter: %s", option, param));
+                        throw new IllegalArgumentException(String.format("Invalid property '%s' in query parameter: %s", property, key));
                     }
 
                     break;
@@ -156,7 +158,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                 // Sort query params
                 case SORT: {
                     if (!valueIsPresent || value.size() != 1) {
-                        throw new IllegalArgumentException(String.format("Invalid CSV value '%s' for '%s' query parameter!", value, key));
+                        throw new IllegalArgumentException(String.format("Invalid CSV value '%s' in '%s' query parameter!", value, key));
                     }
 
                     var sort = this.parseSortExpression(dtoClass, value);
@@ -182,7 +184,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                     }
 
                     if (property == null) {
-                        throw new IllegalArgumentException(String.format("Invalid input property '%s' for query parameter: %s", property, key));
+                        throw new IllegalArgumentException(String.format("Missing input property in query parameter: %s", key));
                     }
 
                     QueryExpression.CompareOperator cmp = (param != null) ? QueryExpression.CompareOperator.valueOf(param) : DEFAULT_FILTER_COMPARATOR;

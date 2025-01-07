@@ -29,7 +29,7 @@ public class JPatronErrorResponse implements JPatronResponseInterface {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonPropertyOrder({ "id", "code", "title", "detail" })
-    static class Error {
+    public static class Error {
 
         @JsonProperty("id")
         private String id;
