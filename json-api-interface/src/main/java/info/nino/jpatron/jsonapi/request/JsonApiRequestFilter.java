@@ -8,10 +8,11 @@ import info.nino.jpatron.jsonapi.annotiation.JsonApiInject;
 import info.nino.jpatron.request.QueryExpression;
 import info.nino.jpatron.request.QuerySort;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.container.ResourceInfo;
@@ -40,8 +41,7 @@ import java.util.stream.Collectors;
 @JsonApi
 @Provider
 //@PreMatching
-//@RequestScoped
-//@Priority(Priorities.HEADER_DECORATOR + 200)
+@Priority(Priorities.ENTITY_CODER + 200)
 public class JsonApiRequestFilter implements ContainerRequestFilter {   //, RequestContext
 
     private static final String DEFAULT_FILTER_COMPARATOR = QueryExpression.CompareOperator.EQ.name();
@@ -110,13 +110,13 @@ public class JsonApiRequestFilter implements ContainerRequestFilter {   //, Requ
         boolean readOnly = jsonApiAnnot.readOnlyDataset();
         boolean allowEntityPaths = jsonApiAnnot.allowEntityPaths();
         String[] allowedPaths = jsonApiAnnot.allowedPaths();
-        String[] fetchEntityPaths = jsonApiAnnot.fetchEntityPaths();
+        //String[] fetchEntityPaths = jsonApiAnnot.fetchEntityPaths();
         String[] entityGraphPaths = jsonApiAnnot.entityGraphPaths();
 
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
         JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, allowEntityPaths, allowedPaths);
 
-        JsonApiRequest jsonApiRequest = new JsonApiRequest(entityClass, queryParams, pagination, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
+        JsonApiRequest jsonApiRequest = new JsonApiRequest(entityClass, queryParams, pagination, distinct, readOnly, entityGraphPaths);
         //this.getJsonApiRequestContext().setJsonApiRequest(jsonApiRequest);
         this.getJsonApiRequestEvent().fire(jsonApiRequest);
     }
@@ -405,7 +405,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter {   //, Requ
     {
         if(regexAllowedPaths != null && regexAllowedPaths.stream().noneMatch(rgx -> (ReflectionHelper.PATH_SEPARATOR + fieldPath).matches(rgx)))    //".field.path"
         {
-            throw new ForbiddenException(String.format("Field path '%s' NOT ALLOWED!", fieldPath));
+            throw new IllegalAccessError(String.format("Field path '%s' NOT ALLOWED!", fieldPath));
         }
     }
 }
