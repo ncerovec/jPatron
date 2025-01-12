@@ -4,7 +4,6 @@ import info.nino.jpatron.api.annotiation.JPatronApi;
 import info.nino.jpatron.api.annotiation.JPatronApiInject;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
-import info.nino.jpatron.helpers.RegexHelper;
 import info.nino.jpatron.request.ApiRequest;
 import info.nino.jpatron.request.QueryExpression;
 import info.nino.jpatron.request.QuerySort;
@@ -12,7 +11,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -40,7 +38,7 @@ import java.util.stream.Collectors;
  */
 @Provider
 @JPatronApi
-@Priority(Priorities.USER + 1)
+@Priority(Priorities.ENTITY_CODER + 200)
 public class JPatronApiRequestFilter implements ContainerRequestFilter {
 
     private static final String QUERY_VALUE_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
@@ -68,11 +66,9 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
     @JPatronApiInject
     Event<JPatronApiRequest<?>> requestEvent;
 
-    private List<String> regexAllowedPaths = null;
-
     @PostConstruct
     public void init() {
-        this.regexAllowedPaths = RegexHelper.compileRegexWildcards(".*");
+
     }
 
     @Override
@@ -89,36 +85,34 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
             return;
         }
 
-        Class<?> entityClass = ReflectionHelper.resolveEntityClassFromDtoClass(dtoClass);
-
-        boolean pagination = JPatronApiAnn.pagination();
-        boolean distinct = JPatronApiAnn.distinctDataset();
-        boolean readOnly = JPatronApiAnn.readOnlyDataset();
         String[] searchPaths = JPatronApiAnn.searchPaths();
         boolean allowEntityPaths = JPatronApiAnn.allowEntityPaths();
         String[] allowedPaths = JPatronApiAnn.allowedPaths();
-        String[] entityGraphPaths = JPatronApiAnn.entityGraphPaths();
-
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
-        ApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, searchPaths, allowEntityPaths, allowedPaths);
+        JPatronRequestContext reqContext = new JPatronRequestContext(dtoClass, searchPaths, allowEntityPaths, allowedPaths, reqQueryParams);
+        ApiRequest.QueryParams queryParams = this.resolveQueryParams(reqContext);
 
-        JPatronApiRequest request = new JPatronApiRequest(entityClass, queryParams, pagination, distinct, readOnly, entityGraphPaths);
+        Class<?> entityClass = ReflectionHelper.resolveEntityClassFromDtoClass(dtoClass);
+        boolean pagination = JPatronApiAnn.pagination();
+        boolean distinct = JPatronApiAnn.distinctDataset();
+        boolean readOnly = JPatronApiAnn.readOnlyDataset();
+        String[] entityGraphPaths = JPatronApiAnn.entityGraphPaths();
+        JPatronApiRequest<?> request = new JPatronApiRequest<>(entityClass, queryParams, pagination, distinct, readOnly, entityGraphPaths);
+
         this.requestEvent.fire(request);
     }
 
-    public ApiRequest.QueryParams resolveQueryParams(Class<?> dtoClass, MultivaluedMap<String, String> queryParams, String[] searchPaths, boolean allowEntityPaths, String[] allowedPaths) {
+    public ApiRequest.QueryParams resolveQueryParams(JPatronRequestContext requestContext) {
 
         ApiRequest.QueryParams requestQueryParams = new ApiRequest.QueryParams(JPatronApiRequestFilter.DEFAULT_PAGE_SIZE, JPatronApiRequestFilter.DEFAULT_PAGE_NUMBER);
-        //List<String> regexAllowedPaths = (allowedPaths != null && allowedPaths.length > 0) ? RegexHelper.compileRegexWildcards(allowedPaths) : null;
+        if (MapUtils.isEmpty(requestContext.getQueryParams())) {
+            return requestQueryParams;
+        }
 
         String jpatronApiQueryParamRegex = "^([^\\[\\]\\s]+)(?:\\[([^\\[\\]\\s]+)\\])?(?:\\[([^\\[\\]\\s]+)\\])?";
         Pattern queryParamRegex = Pattern.compile(jpatronApiQueryParamRegex);
 
-        if (queryParams == null || queryParams.isEmpty()) {
-            return requestQueryParams;
-        }
-
-        for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+        for (Map.Entry<String, List<String>> entry : requestContext.getQueryParams().entrySet()) {
             String key = entry.getKey();
             List<String> value = entry.getValue();
             Matcher queryParamMatcher = queryParamRegex.matcher(key);
@@ -161,7 +155,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                         throw new IllegalArgumentException(String.format("Invalid CSV value '%s' in '%s' query parameter!", value, key));
                     }
 
-                    var sort = this.parseSortExpression(dtoClass, value);
+                    var sort = this.parseSortExpression(requestContext, value);
                     requestQueryParams.setSort(sort);
                     break;
                 }
@@ -172,7 +166,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                         throw new IllegalArgumentException(String.format("Invalid value '%s' for '%s' query parameter!", value, key));
                     }
 
-                    var includes = this.parseIncludeQueryParam(requestQueryParams.getIncludes(), dtoClass, value);
+                    var includes = this.parseIncludeQueryParam(requestContext, requestQueryParams.getIncludes(), value);
                     requestQueryParams.setIncludes(includes);
                     break;
                 }
@@ -188,7 +182,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                     }
 
                     QueryExpression.CompareOperator cmp = (param != null) ? QueryExpression.CompareOperator.valueOf(param) : DEFAULT_FILTER_COMPARATOR;
-                    var filters = this.parsePropertyFilter(requestQueryParams.getFilters(), dtoClass, property, cmp, value);
+                    var filters = this.parsePropertyFilter(requestContext, requestQueryParams.getFilters(), property, cmp, value);
                     requestQueryParams.setFilters(filters);
                     break;
                 }
@@ -199,7 +193,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                         throw new IllegalArgumentException(String.format("Invalid value '%s' for '%s' query parameter!", value, key));
                     }
 
-                    QueryExpression.CompoundFilter compoundQueryTerm = this.parseQueryExpression(dtoClass, value);
+                    QueryExpression.CompoundFilter compoundQueryTerm = this.parseQueryExpression(requestContext, value);
                     requestQueryParams.setCompoundFilter(compoundQueryTerm);
                     break;
                 }
@@ -211,15 +205,14 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                     }
 
                     QueryExpression.ValueModifier mod = (param != null) ? QueryExpression.ValueModifier.valueOf(param) : DEFAULT_SEARCH_MODIFIER;
-                    String[] searchPropertyPaths = (property != null) ? new String[]{property} : searchPaths;
-                    var searches = parseSearchExpression(requestQueryParams.getSearches(), dtoClass, searchPropertyPaths, mod, value);
+                    var searches = this.parseSearchExpression(requestContext, requestQueryParams.getSearches(), property, mod, value);
                     requestQueryParams.setSearches(searches);
                     break;
                 }
 
                 //Distinct query params
                 case DISTINCT: {
-                    var distinctValues = this.parseDistinctQueryParam(requestQueryParams.getDistinctValues(), dtoClass, property, value);
+                    var distinctValues = this.parseDistinctQueryParam(requestContext, requestQueryParams.getDistinctValues(), property, value);
                     requestQueryParams.setDistinctValues(distinctValues);
                     break;
                 }
@@ -227,7 +220,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                 //Meta query params
                 case META: {
                     QueryExpression.Function func = (param != null) ? QueryExpression.Function.valueOf(param) : DEFAULT_META_FUNCTION;
-                    var metaValues = this.parseMetaQueryParam(requestQueryParams.getMetaValues(), dtoClass, property, func, value);
+                    var metaValues = this.parseMetaQueryParam(requestContext, requestQueryParams.getMetaValues(), property, func, value);
                     requestQueryParams.setMetaValues(metaValues);
                     break;
                 }
@@ -237,20 +230,22 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         return requestQueryParams;
     }
 
-    private Pair<Class<?>, String> findEntityFieldByPath(Class<?> clazz, String path) {
-        Pair<Class<?>, String> entityField = ReflectionHelper.findEntityFieldByPath(clazz, path, false);
-        this.checkIfPathAllowed(path, this.regexAllowedPaths);
-        return entityField;
+    private Pair<Class<?>, String> findEntityFieldByPath(JPatronRequestContext requestContext, String path) {
+        this.checkIfPathAllowed(requestContext, path);
+        return ReflectionHelper.findEntityFieldByPath(requestContext.getClazz(), path, requestContext.isAllowEntityPaths());
     }
 
-    private void checkIfPathAllowed(String fieldPath, List<String> regexAllowedPaths) {
-        if (regexAllowedPaths != null
-                && regexAllowedPaths.stream().noneMatch((ReflectionHelper.PATH_SEPARATOR + fieldPath)::matches)) { //".field.path"
-            throw new ForbiddenException(String.format("Field path '%s' NOT ALLOWED!", fieldPath));
+    private void checkIfPathAllowed(JPatronRequestContext requestContext, String fieldPath) {
+        if (requestContext.getRegexAllowedPaths() == null) {
+            throw new IllegalStateException("Allowed field-paths not defined!");
+        }
+
+        if (requestContext.getRegexAllowedPaths().stream().noneMatch(fieldPath::matches)) { //".field.path"
+            throw new IllegalAccessError(String.format("Field path '%s' NOT ALLOWED!", fieldPath));
         }
     }
 
-    private Map<String, Map.Entry<Class<?>, QuerySort.Direction>> parseSortExpression(Class<?> clazz,
+    private Map<String, Map.Entry<Class<?>, QuerySort.Direction>> parseSortExpression(JPatronRequestContext requestContext,
                                                                                       List<String> sortExpression) {
         Map<String, Map.Entry<Class<?>, QuerySort.Direction>> sort = null;
 
@@ -269,7 +264,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                 sortPath = sortPath.substring(1);
             }
 
-            Map.Entry<Class<?>, String> sortField = this.findEntityFieldByPath(clazz, sortPath);
+            Map.Entry<Class<?>, String> sortField = this.findEntityFieldByPath(requestContext, sortPath);
 
             if (sortField != null) {
                 sortPath = sortField.getValue();
@@ -288,19 +283,20 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         return sort;
     }
 
-    private MultiValuedMap<Class<?>, String> parseIncludeQueryParam(MultiValuedMap<Class<?>, String> includes,
-                                                                    Class<?> clazz, List<String> value) {
+    private MultiValuedMap<Class<?>, String> parseIncludeQueryParam(JPatronRequestContext requestContext,
+                                                                    MultiValuedMap<Class<?>, String> includes,
+                                                                    List<String> value) {
         LinkedList<String> includeValues = value.stream().map(s -> s.split(QUERY_VALUE_SEPARATOR)).flatMap(m -> Arrays.stream(m.clone())).collect(Collectors.toCollection(LinkedList::new));
 
         for(String includePath : includeValues) {
             includePath = includePath.trim();   //remove leading and trailing spaces
             if(includePath.isEmpty()) continue;
 
-            Map.Entry<Class<?>, String> includeClassField = this.findEntityFieldByPath(clazz, includePath);
+            Map.Entry<Class<?>, String> includeClassField = this.findEntityFieldByPath(requestContext, includePath);
             //TODO: check why not just: includes.put(includeClassField.getKey(), includeClassField.getValue());
             if(includeClassField != null) {
                 Optional<Field> includeField = ReflectionHelper.findModelField(includeClassField.getKey(), ReflectionHelper.getFieldNameFromPath(includeClassField.getValue()));
-                if(!includeField.isPresent()) throw new RuntimeException(String.format("Include Entity field '%s' NOT FOUND in Class: %s!", ReflectionHelper.getFieldNameFromPath(includeClassField.getValue()), includeClassField.getKey()));
+                if(includeField.isEmpty()) throw new RuntimeException(String.format("Include Entity field '%s' NOT FOUND in Class: %s!", ReflectionHelper.getFieldNameFromPath(includeClassField.getValue()), includeClassField.getKey()));
 
                 Class<?> includeEntity = includeField.get().getType();
                 if(Collection.class.isAssignableFrom(includeEntity)) includeEntity = (Class<?>) ((ParameterizedType) includeField.get().getGenericType()).getActualTypeArguments()[0];
@@ -314,10 +310,11 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
     }
 
     private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> parsePropertyFilter(
+            JPatronRequestContext requestContext,
             Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> filters,
-            Class<?> clazz, String property, QueryExpression.CompareOperator cmp,  List<String> values) {
+            String property, QueryExpression.CompareOperator cmp,  List<String> values) {
 
-        Map.Entry<Class<?>, String> filterField = this.findEntityFieldByPath(clazz, property);
+        Map.Entry<Class<?>, String> filterField = this.findEntityFieldByPath(requestContext, property);
 
         if (filterField != null) {
             Class<?> filterEntity = filterField.getKey();
@@ -336,10 +333,10 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         return filters;
     }
 
-    private QueryExpression.CompoundFilter parseQueryExpression(Class<?> clazz, List<String> queryTerms) {
-
+    private QueryExpression.CompoundFilter parseQueryExpression(JPatronRequestContext requestContext,
+                                                                List<String> queryTerms) {
         List<QueryExpression.CompoundFilter> compoundQueryTerms = queryTerms.stream()
-                .map(queryTerm -> this.parseQueryExpression(null, clazz, queryTerm))
+                .map(queryTerm -> this.parseQueryExpression(requestContext, null, queryTerm))
                 .toList();
 
         return (compoundQueryTerms.size() > 1)
@@ -347,9 +344,9 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                 : compoundQueryTerms.get(0);
     }
 
-    private QueryExpression.CompoundFilter parseQueryExpression(QueryExpression.CompoundFilter parentTerm,
-                                                                Class<?> clazz, String queryTerm) {
-
+    private QueryExpression.CompoundFilter parseQueryExpression(JPatronRequestContext requestContext,
+                                                                QueryExpression.CompoundFilter parentTerm,
+                                                                String queryTerm) {
         //NOTICE: same level compound hierarchy nesting priority: OR -> AND -> (compound)
         queryTerm = queryTerm.trim();
 
@@ -361,7 +358,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
             var subExpression = queryTerm.substring(1, subQueryEndIndex);
             queryTerm = queryTerm.substring(subQueryEndIndex + 1);
 
-            var subTerm = parseQueryExpression(null, clazz, subExpression);
+            var subTerm = parseQueryExpression(requestContext, null, subExpression);
 
             if (parentTerm != null) {
                 parentTerm.addCompoundFilters(subTerm);
@@ -400,7 +397,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         }
 
         if (compoundOperator == null) {
-            var simpleTerm = parseSimpleTerm(clazz, queryTerm);
+            var simpleTerm = parseSimpleTerm(requestContext, queryTerm);
             parentTerm.addFilters(simpleTerm);
         } else {
             if (compoundOperator == QueryExpression.LogicOperator.AND
@@ -411,7 +408,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                 parentTerm = newCompound;
             }
 
-            parseQueryExpression(parentTerm, clazz, left);
+            parseQueryExpression(requestContext, parentTerm, left);
 
             if (compoundOperator == QueryExpression.LogicOperator.OR
                     && parentTerm.getLogicOperator() == QueryExpression.LogicOperator.AND) {
@@ -421,7 +418,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                 parentTerm = newCompound;
             }
 
-            var rightTerm = parseQueryExpression(parentTerm, clazz, right);
+            var rightTerm = parseQueryExpression(requestContext, parentTerm, right);
 
             //current compound is AND while next (right) is OR - right part of expression has priority (in parent "AND" recursion iteration)
             if (orIndex > andIndex) {
@@ -432,12 +429,12 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         return parentTerm;
     }
 
-    private QueryExpression.Filter<?> parseSimpleTerm(Class<?> clazz, String query) {
+    private QueryExpression.Filter<?> parseSimpleTerm(JPatronRequestContext requestContext, String query) {
         Pattern termRegex = Pattern.compile("^([^\\s:=<>!#^~]+)[\\s]*(:[=<>!#^~]{0,2})[\\s]*([^\\n]*)");
         Matcher termMatcher = termRegex.matcher(query);
         if (termMatcher.matches()) {
             String fieldPath = termMatcher.group(1);
-            this.checkIfPathAllowed(fieldPath, this.regexAllowedPaths);
+            this.checkIfPathAllowed(requestContext, fieldPath);
 
             JPatronApiRequest.Comparator cmp = Arrays.stream(JPatronApiRequest.Comparator.values())
                     .filter(c -> c.getValue().equals(termMatcher.group(2)))
@@ -446,10 +443,10 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
 
             if (cmp == JPatronApiRequest.Comparator.IN) {
                 String[] values = this.splitCSValue(value);
-                return new QueryExpression.Filter<>(clazz, fieldPath, cmp.getCompareOperator(), values);
+                return new QueryExpression.Filter<>(requestContext.getClazz(), fieldPath, cmp.getCompareOperator(), values);
             } else {
                 value = this.removeSurroundingQuotes(value);
-                return new QueryExpression.Filter<>(clazz, fieldPath, cmp.getCompareOperator(), value);
+                return new QueryExpression.Filter<>(requestContext.getClazz(), fieldPath, cmp.getCompareOperator(), value);
             }
         } else {
             throw new IllegalArgumentException("Term '%s' doesn't match JPatron REST-API guideline syntax!".formatted(query));
@@ -457,7 +454,8 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
     }
 
     //helper method to find the top-level logical operator (ignoring nested ones)
-    private LinkedHashMap<String, Integer> findFirstIndexesForLiteralsOnQueryRootLevel(String query, String... literals) {
+    private LinkedHashMap<String, Integer> findFirstIndexesForLiteralsOnQueryRootLevel(String query,
+                                                                                       String... literals) {
         LinkedHashMap<String, Integer> literalIndexes = new LinkedHashMap<>();
         Arrays.stream(literals).forEach(k -> literalIndexes.put(k, -1));
 
@@ -520,7 +518,8 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         return result.toArray(new String[0]);
     }
 
-    private void addValueToCSVList(List<String> resultList, StringBuilder currentField) {
+    private void addValueToCSVList(List<String> resultList,
+                                   StringBuilder currentField) {
         String newField = currentField.toString().trim();
         newField = removeSurroundingQuotes(newField);
         resultList.add(newField);
@@ -538,22 +537,30 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
     }
 
     private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> parseSearchExpression(
+            JPatronRequestContext requestContext,
             Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> searches,
-            Class<?> clazz, String[] searchPaths, QueryExpression.ValueModifier modifier, List<String> value) {
-
+            String reqSearchPath, QueryExpression.ValueModifier modifier, List<String> value) {
         Map<String, Class<?>> searchFieldsPaths = new HashMap<>();
-        for (String searchPath : searchPaths) {
-            if (searchPath.endsWith(String.valueOf(FIELD_PATH_CONCATENATOR))) {
-                String parentClassPath = searchPath.substring(0, searchPath.length() - 1);
-                Class<?> searchFieldClass = ReflectionHelper.findFieldByPath(clazz, parentClassPath)
-                        .map(f -> (Class) f.getType()).orElse(clazz);
-                ReflectionHelper.getAllModelFields(searchFieldClass)
-                        .stream().filter(f -> f.getType() == String.class)
-                        .forEach(fieldPath -> searchFieldsPaths.put(StringUtils.isNotBlank(parentClassPath)
-                                ? searchPath + fieldPath.getName() : fieldPath.getName(), searchFieldClass));
-            } else {
-                Pair<Class<?>, String> searchField = ReflectionHelper.findEntityFieldByPath(clazz, searchPath, true);
-                searchFieldsPaths.put(searchField.getValue(), searchField.getKey());
+
+        if (reqSearchPath != null) {
+            Pair<Class<?>, String> searchField = this.findEntityFieldByPath(requestContext, reqSearchPath);
+            searchFieldsPaths.put(searchField.getValue(), searchField.getKey());
+        } else {
+            for (String searchPath : requestContext.getSearchPaths()) {
+                if (searchPath.endsWith(String.valueOf(FIELD_PATH_CONCATENATOR))) {
+                    String parentClassPath = searchPath.substring(0, searchPath.length() - 1);
+                    Class<?> searchFieldClass = ReflectionHelper.findFieldByPath(requestContext.getClazz(), parentClassPath)
+                            .map(f -> (Class) f.getType()).orElse(requestContext.getClazz());
+
+                    ReflectionHelper.getAllModelFields(searchFieldClass)
+                            .stream().filter(f -> f.getType() == String.class)
+                            .forEach(fieldPath -> searchFieldsPaths.put(
+                                    StringUtils.isNotBlank(parentClassPath) ? searchPath + fieldPath.getName() : fieldPath.getName(),
+                                    searchFieldClass));
+                } else {
+                    Pair<Class<?>, String> searchField = ReflectionHelper.findEntityFieldByPath(requestContext.getClazz(), searchPath, true);
+                    searchFieldsPaths.put(searchField.getValue(), searchField.getKey());
+                }
             }
         }
 
@@ -579,9 +586,10 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         return searches;
     }
 
-    private Map<Class<?>, MultiValuedMap<String, String>> parseDistinctQueryParam(Map<Class<?>, MultiValuedMap<String, String>> distinctValues,
-                                                                                  Class<?> clazz, String keyColumnPath, List<String> labelColumnPaths) {
-        Map.Entry<Class<?>, String> keyField = this.findEntityFieldByPath(clazz, keyColumnPath);
+    private Map<Class<?>, MultiValuedMap<String, String>> parseDistinctQueryParam(JPatronRequestContext requestContext,
+                                                                                  Map<Class<?>, MultiValuedMap<String, String>> distinctValues,
+                                                                                  String keyColumnPath, List<String> labelColumnPaths) {
+        Map.Entry<Class<?>, String> keyField = this.findEntityFieldByPath(requestContext, keyColumnPath);
 
         if(keyField != null) {
             Class<?> distinctEntity = keyField.getKey();
@@ -592,7 +600,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
 
             CollectionUtils.emptyIfNull(labelColumnPaths).forEach(labelColumnPath -> {
                 if(StringUtils.isNotBlank(labelColumnPath)) {
-                    Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(clazz, labelColumnPath);
+                    Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(requestContext, labelColumnPath);
                     if (labelField == null) {
                         throw new IllegalStateException(String.format("Distinct Value '%s' - label field path '%s' not resolved!", keyColumnPath, labelColumnPath));
                     }
@@ -607,9 +615,10 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         return distinctValues;
     }
 
-    private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> parseMetaQueryParam(Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> metaValues,
-                                                                                                             Class<?> clazz, String valueColumnPath, QueryExpression.Function function, List<String> labelColumnPaths) {
-        Map.Entry<Class<?>, String> valueField = this.findEntityFieldByPath(clazz, valueColumnPath);
+    private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> parseMetaQueryParam(JPatronRequestContext requestContext,
+                                                                                                             Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> metaValues,
+                                                                                                             String valueColumnPath, QueryExpression.Function function, List<String> labelColumnPaths) {
+        Map.Entry<Class<?>, String> valueField = this.findEntityFieldByPath(requestContext, valueColumnPath);
 
         if(valueField != null) {
             Class<?> metaEntity = valueField.getKey();
@@ -623,7 +632,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
             //replaced: metaFuncs.addAll(function, labelColumnPaths);
             CollectionUtils.emptyIfNull(labelColumnPaths).forEach(labelColumnPath -> {
                 if(StringUtils.isNotBlank(labelColumnPath)) {
-                    Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(clazz, labelColumnPath);
+                    Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(requestContext, labelColumnPath);
                     if (labelField == null) {
                         throw new IllegalStateException(String.format("Meta Value '%s' - label field path '%s' not resolved!", valueColumnPath, labelColumnPath));
                     }

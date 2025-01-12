@@ -21,8 +21,8 @@ public class JPatronApiRequest<T> extends ApiRequest<T> {
         AND(QueryExpression.LogicOperator.AND, "AND"),
         OR(QueryExpression.LogicOperator.OR, "OR");
 
-        QueryExpression.LogicOperator logicOperator;
-        String value;
+        private final QueryExpression.LogicOperator logicOperator;
+        private final String value;
 
         CompoundOperator(QueryExpression.LogicOperator logicOperator, String value) {
             this.logicOperator = logicOperator;
@@ -36,7 +36,7 @@ public class JPatronApiRequest<T> extends ApiRequest<T> {
 
         @Override
         public QueryExpression.LogicOperator getLogicOperator() {
-            return null;
+            return logicOperator;
         }
     }
 
@@ -52,12 +52,12 @@ public class JPatronApiRequest<T> extends ApiRequest<T> {
         LToE(QueryExpression.CompareOperator.LToE, ":<="),
         IN(QueryExpression.CompareOperator.IN, ":^");
 
-        QueryExpression.CompareOperator compareOperator;
-        String value;
+        private final QueryExpression.CompareOperator compareOperator;
+        private final String value;
 
         Comparator(QueryExpression.CompareOperator compareOperator, String value) {
-            this.value = value;
             this.compareOperator = compareOperator;
+            this.value = value;
         }
 
         @Override

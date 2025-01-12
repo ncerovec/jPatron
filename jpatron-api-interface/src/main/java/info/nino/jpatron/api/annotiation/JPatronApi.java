@@ -80,13 +80,6 @@ public @interface JPatronApi
     String[] allowedPaths() default {"."};
 
     /**
-     * List of entity-paths which should be eager-loaded alongside result DTO object - bulk fetch entities (optimize fetching related entities)
-     * This is performance optimization property - ensures related entities are eager-loaded (meant for related objects which will be immediately used)
-     * @return array of related entity-paths
-     */
-    String[] fetchEntityPaths() default {};
-
-    /**
      * List of entity-paths which should be eager-loaded alongside result DTO object - preload entities (optimize fetching related entities)
      * This is performance optimization property - ensures related entities are eager-loaded (meant for related objects which will be immediately used)
      * @return array of related entity-paths
