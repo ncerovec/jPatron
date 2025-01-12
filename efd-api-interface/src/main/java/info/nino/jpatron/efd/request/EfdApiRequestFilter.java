@@ -12,7 +12,6 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -44,7 +43,7 @@ import java.util.stream.Collectors;
  */
 @EfdApi
 @Provider
-@Priority(Priorities.USER + 1)
+@Priority(Priorities.ENTITY_CODER + 200)
 public class EfdApiRequestFilter implements ContainerRequestFilter {
 
     private static final String QUERY_VALUE_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
@@ -156,15 +155,17 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
     }
 
     private Pair<Class<?>, String> findEntityFieldByPath(Class<?> clazz, String path) {
-        Pair<Class<?>, String> entityField = ReflectionHelper.findEntityFieldByPath(clazz, path, false);
         this.checkIfPathAllowed(path, this.regexAllowedPaths);
-        return entityField;
+        return ReflectionHelper.findEntityFieldByPath(clazz, path, false);
     }
 
     private void checkIfPathAllowed(String fieldPath, List<String> regexAllowedPaths) {
-        if (regexAllowedPaths != null
-                && regexAllowedPaths.stream().noneMatch((ReflectionHelper.PATH_SEPARATOR + fieldPath)::matches)) { //".field.path"
-            throw new ForbiddenException(String.format("Field path '%s' NOT ALLOWED!", fieldPath));
+        if (regexAllowedPaths == null) {
+            throw new IllegalStateException("Allowed field-paths not defined!");
+        }
+
+        if (regexAllowedPaths.stream().noneMatch(fieldPath::matches)) { //".field.path"
+            throw new IllegalAccessError(String.format("Field path '%s' NOT ALLOWED!", fieldPath));
         }
     }
 
