@@ -5,9 +5,9 @@ import info.nino.jpatron.request.ApiRequest;
 /**
  * JSON:API request implementation
  */
-public class JsonApiRequest extends ApiRequest {
+public class JsonApiRequest<T> extends ApiRequest<T> {
 
-    public JsonApiRequest(Class<?> rootEntity,
+    public JsonApiRequest(Class<T> rootEntity,
                           ApiRequest.QueryParams queryParams,
                           boolean pagination,
                           boolean distinct,

@@ -237,7 +237,9 @@ public class ReflectionHelper {
 
     public static Class<?> resolveEntityClassFromDtoClass(Class<?> clazz)
     {
-        if(clazz.isAnnotationPresent(EntityClass.class)) clazz = clazz.getAnnotation(EntityClass.class).value();
+        if(clazz.isAnnotationPresent(EntityClass.class)) {
+            clazz = clazz.getAnnotation(EntityClass.class).value();
+        }
 
         ReflectionHelper.verifyIsEntityClass(clazz);
 

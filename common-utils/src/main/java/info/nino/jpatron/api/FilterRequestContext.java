@@ -1,4 +1,4 @@
-package info.nino.jpatron.api.request;
+package info.nino.jpatron.api;
 
 import info.nino.jpatron.helpers.RegexHelper;
 import jakarta.ws.rs.core.MultivaluedMap;
@@ -6,19 +6,19 @@ import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.List;
 
-public class JPatronRequestContext {
+public class FilterRequestContext {
 
-    private Class<?> clazz;
-    private String[] searchPaths;
-    private boolean allowEntityPaths;
-    private List<String> regexAllowedPaths;
-    private MultivaluedMap<String, String> queryParams;
+    private final Class<?> clazz;
+    private final String[] searchPaths;
+    private final boolean allowEntityPaths;
+    private final List<String> regexAllowedPaths;
+    private final MultivaluedMap<String, String> queryParams;
 
-    public JPatronRequestContext(Class<?> clazz,
-                                 String[] searchPaths,
-                                 boolean allowEntityPaths,
-                                 String[] allowedPaths,
-                                 MultivaluedMap<String, String> queryParams) {
+    public FilterRequestContext(Class<?> clazz,
+                                String[] searchPaths,
+                                boolean allowEntityPaths,
+                                String[] allowedPaths,
+                                MultivaluedMap<String, String> queryParams) {
         this.clazz = clazz;
         this.queryParams = queryParams;
         this.searchPaths = searchPaths;

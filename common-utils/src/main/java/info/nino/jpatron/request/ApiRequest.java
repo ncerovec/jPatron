@@ -311,5 +311,9 @@ public abstract class ApiRequest<T> implements Serializable {
             QueryExpression.CompareOperator getCompareOperator();
             String getValue();
         }
+
+        public interface QueryParamType {
+            String getQueryParam();
+        }
     }
 }

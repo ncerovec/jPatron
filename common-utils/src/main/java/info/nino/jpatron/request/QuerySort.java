@@ -8,6 +8,8 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public class QuerySort {
 
+    public enum Direction { ASC, DESC; }
+
     private final Pair<Class<?>, String> columnEntityPath;
     private final Direction direction;
     private Class<?> sortType;
@@ -53,27 +55,5 @@ public class QuerySort {
      */
     public Direction getDirection() {
         return direction;
-    }
-
-
-    /**
-     * Enum used as direction for Sort parameters
-     */
-    public enum Direction
-    {
-        ASC, DESC;
-
-        /**
-         * Resolves String ("+"/"-") to Direction enum (ASC/DESC)
-         * @param directionSign
-         * @return
-         */
-        public static Direction resolveDirectionSign(char directionSign) {
-            if ('-' == directionSign) {
-                return Direction.DESC;
-            } else {
-                return Direction.ASC;
-            }
-        }
     }
 }
