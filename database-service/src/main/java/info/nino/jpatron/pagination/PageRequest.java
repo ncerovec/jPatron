@@ -45,7 +45,7 @@ public class PageRequest
     /**
      * Set of sorting parameters of Sort type
      */
-    private Set<Sort> sorts = new HashSet<>();
+    private Set<Sort> sorts = new LinkedHashSet<>();
 
     /**
      * EntityService query-filters
