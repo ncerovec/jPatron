@@ -42,7 +42,7 @@ public class DateTimeFormatUtil
             }
             catch(Exception e)
             {
-                logger.log(Level.WARNING, "Error formatting Date from value '" + String.valueOf(date) + "'!", e);
+                logger.log(Level.WARNING, String.format("Error formatting Date '%s' value with format pattern '%s'!", String.valueOf(date), pattern));
                 //e.printStackTrace();
             }
         }
@@ -70,7 +70,7 @@ public class DateTimeFormatUtil
             }
             catch(Exception e)
             {
-                logger.log(Level.WARNING, "Error parsing Date from value '" + dateString + "'!", e);
+                logger.log(Level.WARNING, String.format("Error parsing Date '%s' value with format pattern '%s'!", dateString, pattern));
                 //e.printStackTrace();
             }
         }

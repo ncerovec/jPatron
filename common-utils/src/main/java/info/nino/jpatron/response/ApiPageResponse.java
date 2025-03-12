@@ -67,7 +67,6 @@ public abstract class ApiPageResponse<T> implements Serializable
         }
     }
 
-
     /**
      * {@link ApiPageResponse#pageNumber}
      * @return pageNumber
