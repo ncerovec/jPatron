@@ -1,6 +1,8 @@
 package info.nino.jpatron.helpers;
 
 import info.nino.jpatron.annotiation.EntityClass;
+import org.apache.commons.lang3.tuple.MutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.beans.BeanInfo;
 import java.beans.IntrospectionException;
@@ -9,9 +11,13 @@ import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public class ReflectionHelper
-{
+public class ReflectionHelper {
+
+    private static Logger logger = Logger.getLogger(ReflectionHelper.class.getName());
+
     public static final String PATH_SEPARATOR = "."; //PATH_DELIMITER
     private static final List<String> ENTITY_ANNOTATION_CLASSES = Arrays.asList("jakarta.persistence.Entity", "jakarta.persistence.Embeddable");
 
@@ -29,6 +35,19 @@ public class ReflectionHelper
         }
 
         return fieldName;
+    }
+
+    public static String getPathWithoutLastItem(String fieldPath)
+    {
+        String path = null;
+
+        if(fieldPath != null)
+        {
+            int fieldStartIndex = fieldPath.lastIndexOf(ReflectionHelper.PATH_SEPARATOR);
+            if(fieldStartIndex >= 0) path = fieldPath.substring(0, fieldStartIndex);
+        }
+
+        return path;
     }
 
     public static LinkedList<String> pathToLinkedList(String path)
@@ -135,13 +154,13 @@ public class ReflectionHelper
         return fieldOptional;
     }
 
-    public static Map.Entry<Class<?>, String> findEntityFieldByPath(Class<?> clazz, String path, boolean allowEntityDive) throws RuntimeException
+    public static Pair<Class<?>, String> findEntityFieldByPath(Class<?> clazz, String path, boolean allowEntityDive) throws RuntimeException
     {
         LinkedList<String> paths = ReflectionHelper.pathToLinkedList(path);
         return ReflectionHelper.findEntityFieldByPath(clazz, paths, null, allowEntityDive);
     }
 
-    private static Map.Entry<Class<?>, String> findEntityFieldByPath(Class<?> clazz, LinkedList<String> paths, String prefixPath, boolean allowEntityDive) throws RuntimeException
+    private static Pair<Class<?>, String> findEntityFieldByPath(Class<?> clazz, LinkedList<String> paths, String prefixPath, boolean allowEntityDive) throws RuntimeException
     {
         String findField = paths.removeFirst();
 
@@ -170,19 +189,19 @@ public class ReflectionHelper
                 //logger.info(String.format("DTO/ENTITY Class resolved from Collection (%s): %s", nextClass.getSimpleName(), field.getType()));
             }
 
-            Map.Entry<Class<?>, String> pathField = ReflectionHelper.resolveEntityClassAndFieldName(clazz, field);
+            Pair<Class<?>, String> pathField = ReflectionHelper.resolveEntityClassAndFieldName(clazz, field);
             prefixPath = (prefixPath != null) ? prefixPath + ReflectionHelper.PATH_SEPARATOR + pathField.getValue() : pathField.getValue();   //current field entity-path
 
             //String remainingPath = String.join(ReflectionHelper.PATH_SEPARATOR, paths);
-            //Map.Entry<Class<?>, String> nextField = ReflectionHelper.findClassFieldByPath(nextClass, remainingPath, allowEntityDive);
-            Map.Entry<Class<?>, String> nextField = ReflectionHelper.findEntityFieldByPath(nextClass, paths, prefixPath, allowEntityDive);
+            //Pair<Class<?>, String> nextField = ReflectionHelper.findClassFieldByPath(nextClass, remainingPath, allowEntityDive);
+            Pair<Class<?>, String> nextField = ReflectionHelper.findEntityFieldByPath(nextClass, paths, prefixPath, allowEntityDive);
 
             return nextField;
         }
         else
         {
             //NOTICE: method resolveEntityClassAndFieldName() invokes back findFieldByPath() recursion if field is path!
-            Map.Entry<Class<?>, String> finalField = ReflectionHelper.resolveEntityClassAndFieldName(clazz, field);
+            Pair<Class<?>, String> finalField = ReflectionHelper.resolveEntityClassAndFieldName(clazz, field);
 
             //extend finalField name with path to root entity
             if(prefixPath != null) finalField.setValue(prefixPath + ReflectionHelper.PATH_SEPARATOR + finalField.getValue());
@@ -192,7 +211,7 @@ public class ReflectionHelper
     }
 
     //NOTICE: resolve real entity class & field name - with annotation fallbacks
-    private static Map.Entry<Class<?>, String> resolveEntityClassAndFieldName(Class<?> clazz, Field field)
+    private static Pair<Class<?>, String> resolveEntityClassAndFieldName(Class<?> clazz, Field field)
     {
         EntityClass fieldEntityClass = ReflectionHelper.getFieldOrAccessorOrMutatorAnnotation(clazz, field, EntityClass.class);
         if(clazz.isAnnotationPresent(EntityClass.class)) clazz = clazz.getAnnotation(EntityClass.class).value();
@@ -205,18 +224,36 @@ public class ReflectionHelper
 
         if(fieldName.contains(ReflectionHelper.PATH_SEPARATOR)) //check if fieldName is path
         {
-            Map.Entry<Class<?>, String> pathField = ReflectionHelper.findEntityFieldByPath(clazz, fieldName,true);
+            Pair<Class<?>, String> pathField = ReflectionHelper.findEntityFieldByPath(clazz, fieldName,true);
             clazz = pathField.getKey();
             fieldName = pathField.getValue();
         }
 
+        ReflectionHelper.verifyIsEntityClass(clazz);
+        ReflectionHelper.verifyClassHasField(clazz, fieldName);
+
+        return new MutablePair<>(clazz, fieldName);
+    }
+
+    public static Class<?> resolveEntityClassFromDtoClass(Class<?> clazz)
+    {
+        if(clazz.isAnnotationPresent(EntityClass.class)) clazz = clazz.getAnnotation(EntityClass.class).value();
+
+        ReflectionHelper.verifyIsEntityClass(clazz);
+
+        return clazz;
+    }
+
+    private static void verifyIsEntityClass(Class<?> clazz)
+    {
         boolean isEntityClass = Arrays.stream(clazz.getAnnotations()).anyMatch(a -> ENTITY_ANNOTATION_CLASSES.contains(a.annotationType().getName()));
         if(!isEntityClass) throw new IllegalStateException(String.format("FINAL ENTITY Class is not @Entity/@Embeddable: %s!", clazz.getSimpleName()));
+    }
 
+    private static void verifyClassHasField(Class<?> clazz, String fieldName)
+    {
         Optional<Field> foundField = ReflectionHelper.findModelField(clazz, ReflectionHelper.getFieldNameFromPath(fieldName));
         if(!foundField.isPresent()) throw new IllegalStateException(String.format("Field '%s' NOT FOUND in FINAL ENTITY Class: %s!", fieldName, clazz.getSimpleName()));
-
-        return new AbstractMap.SimpleEntry(clazz, fieldName);
     }
 
     public static <T extends Annotation> T getFieldOrAccessorOrMutatorAnnotation(Field field, Class<T> annotationClass)
@@ -293,53 +330,75 @@ public class ReflectionHelper
     }
     */
 
-    @SuppressWarnings("unchecked")  //TODO: verify this method (might have bugzzz)
-    public static <T> Class<T> getGenericClassParameter(final Class<?> parameterizedSubClass, final Class<?> genericSuperClass, final int pos)
+    public static <T> Class<T> findGenericClassParameterType(final Class<?> parameterizedClass, final Class<?> genericSuperClass, final int pos)
     {
-        //Mapping from type variables to actual values (classes)
-        Map<TypeVariable<?>, Class<?>> mapping = new HashMap<>();
+        if (parameterizedClass == null) {
+            throw new IllegalArgumentException("Invalid invocation with NULL 'parameterizedClass' parameter!");
+        }
 
-        Class<?> clazz = parameterizedSubClass;
-        while(clazz != null)
-        {
-            ArrayList<Type> types = new ArrayList(Arrays.asList(clazz.getGenericInterfaces()));
-            types.add(clazz.getGenericSuperclass());
+        if (genericSuperClass == null) {
+            throw new IllegalArgumentException("Invalid invocation with NULL 'genericSuperClass' parameter!");
+        }
 
-            for(Type type : types)
-            {
-                if(type instanceof ParameterizedType)
+        Class<T> parameterType = ReflectionHelper.findGenericTypeParameterType(parameterizedClass, genericSuperClass, pos, new LinkedHashMap<>(), -1);
+
+        if (parameterType == null) {
+            throw new IllegalStateException(String.format("Parameter [%d] type of generic supertype '%s' from '%s' class NOT FOUND!", pos, genericSuperClass.getSimpleName(), parameterizedClass.getTypeName()));
+        }
+
+        return parameterType;
+    }
+
+    private static <T> Class<T> findGenericTypeParameterType(final Class<?> parameterizedClass, final Class<?> genericSuperClass, final int pos, Map<TypeVariable<?>, Class<?>> typeMapping, int recursionLevel)
+    {
+        recursionLevel++;
+
+        Class<T> parameterType = null;
+        logger.log(Level.FINE, String.format("Currently resolving parameter [%d] type of '%s' in '%s' class (recursion level: %d)...", pos, genericSuperClass.getSimpleName(), parameterizedClass.getTypeName(), recursionLevel));
+
+        ArrayList<Type> nextTypes = new ArrayList<>(Arrays.asList(parameterizedClass.getGenericInterfaces()));
+        nextTypes.add(parameterizedClass.getGenericSuperclass());
+        //Class<?> nextClass = parameterizedClass.getSuperclass();    //NOTICE: was only superclass implementation
+        //Type genericType = parameterizedClass.getGenericSuperclass();
+        //Class<?> nextClass = (genericType instanceof Class<?>) ? (Class<?>) genericType : parameterizedClass.getSuperclass();
+        //nextTypes.add(nextClass);
+
+        for (Type type : nextTypes) {
+            if (type instanceof ParameterizedType parType) {
+                //resolve mapping from type variables to actual values (classes)
+                Type[] vars = ((GenericDeclaration) (parType.getRawType())).getTypeParameters();
+                Type[] args = parType.getActualTypeArguments();
+                for(int i = 0; i < vars.length; i++)
                 {
-                    ParameterizedType parType = (ParameterizedType) type;
-                    Type rawType = parType.getRawType();
-
-                    if(rawType == genericSuperClass)
-                    {
-                        //found
-                        Type t = parType.getActualTypeArguments()[pos];
-                        if(t instanceof Class<?>) return (Class<T>) t;
-                        else return (Class<T>) mapping.get((TypeVariable<?>) t);
-                    }
-
-                    //resolve
-                    Type[] vars = ((GenericDeclaration) (parType.getRawType())).getTypeParameters();
-                    Type[] args = parType.getActualTypeArguments();
-                    for(int i = 0; i < vars.length; i++)
-                    {
-                        if(args[i] instanceof Class<?>) mapping.put((TypeVariable) vars[i], (Class<?>) args[i]);
-                        else mapping.put((TypeVariable) vars[i], mapping.get((TypeVariable<?>) (args[i])));
-                    }
-
-                    clazz = (Class<?>) rawType;
+                    if(args[i] instanceof Class<?>) typeMapping.put((TypeVariable) vars[i], (Class<?>) args[i]);
+                    else typeMapping.put((TypeVariable) vars[i], typeMapping.get((TypeVariable<?>) (args[i])));
                 }
-                else
-                {
-                    //clazz = clazz.getSuperclass();    //NOTICE: was only superclass implementation
-                    Type genericType = clazz.getGenericSuperclass();
-                    clazz = (genericType instanceof  Class<?>) ? (Class<?>) genericType : clazz.getSuperclass();
+
+                Type rawType = parType.getRawType();
+                if (rawType == genericSuperClass) {
+                    //found
+                    Type t = parType.getActualTypeArguments()[pos];
+                    parameterType = (t instanceof Class<?>) ? (Class<T>) t : (Class<T>) typeMapping.get((TypeVariable<?>) t);
+                }
+            }
+
+            if (parameterType == null) {
+                Class<?> nextType = null;
+                if (type instanceof ParameterizedType parType) {
+                    nextType = (Class<?>) parType.getRawType();
+                } else if (type instanceof Class) {
+                    nextType = (Class<?>) type;
+                }
+
+                if (nextType != null && nextType != Object.class) {
+                    parameterType = ReflectionHelper.findGenericTypeParameterType(nextType, genericSuperClass, pos, typeMapping, recursionLevel);
+                    if (parameterType != null) {
+                        break;
+                    }
                 }
             }
         }
 
-        throw new IllegalStateException(String.format("Generic supertype %s for %s class NOT FOUND!", genericSuperClass.getSimpleName(), parameterizedSubClass.getSimpleName()));
+        return parameterType;
     }
 }

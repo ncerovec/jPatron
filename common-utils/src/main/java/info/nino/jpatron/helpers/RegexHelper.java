@@ -46,15 +46,14 @@ public class RegexHelper
         if(wildcard != null)
         {
             StringBuffer b = new StringBuffer();
-
-            Pattern regex = Pattern.compile("\\.[^.*]+|(\\.)$|(\\.\\*)");
+            Pattern regex = Pattern.compile("[^.*]+|(\\.)$|(\\.\\*)");
             Matcher m = regex.matcher(wildcard);
             while(m.find())
             {
                 //TODO ADD: '!<path>.*' ('!.field', '!.field.*') => exclude path
-                if(m.group(1) != null) m.appendReplacement(b, "\\\\.[^.]*");    //'<path>.' ('.', '.field.') => all root level fields under path
-                else if(m.group(2) != null) m.appendReplacement(b, ".*");       //'<path>.*' ('.*', '.field.*') => all level fields under path
-                else m.appendReplacement(b, "\\\\Q" + m.group(0) + "\\\\E");    //'<path>' ('.field', '.field.subfield') => exact field path
+                if(m.group(1) != null) m.appendReplacement(b, "\\\\.[^.]*");    //'<path>.' ('.', 'field.') => all root level fields under path
+                else if(m.group(2) != null) m.appendReplacement(b, ".*");       //'<path>.*' ('.*', 'field.*') => all level fields under path
+                else m.appendReplacement(b, "\\\\Q" + m.group(0) + "\\\\E");    //'<path>' ('field', 'field.subfield') => exact field path
 
                 //NOTICE: Java Regex literal string: Pattern.quote("<string>") = "\\Q" + "<string>" + "\\E"
             }

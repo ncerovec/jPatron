@@ -46,7 +46,7 @@ public class PersonService implements EntityService<PersonEntity>
 
 //TODO: Static filters/distinct/meta examples
 
-//TODO: Compound EntityService.QueryExpression.Conditional expression definition
+//TODO: Compound QueryExpression.Conditional expression definition
 
 ### <a name="sysnetguidelineforjson:apiws-cross-joindefinitions-usingunrelated/unasociatedentity"></a>**Cross-Join definitions - using unrelated/unasociated Entity**
 - Simulates LEFT OUTER JOIN using CROSS-JOIN:
