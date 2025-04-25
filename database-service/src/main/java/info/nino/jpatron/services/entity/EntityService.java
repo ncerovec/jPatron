@@ -979,11 +979,11 @@ public interface EntityService<E>
             Subquery<Long> subquery = null;
 
             //convert filter column to comparison type
-            if(QueryExpression.Filter.booleanComparators.contains(comparator))
+            if(QueryExpression.Filter.booleanComparators.contains(comparator) && !Boolean.class.isAssignableFrom(filterColumn.getJavaType()))
             {
                 cmpFilterColumn = (Expression<? extends T>) filterColumn.as(Boolean.class);
             }
-            else if(comparator == QueryExpression.Filter.Cmp.LIKE)
+            else if(comparator == QueryExpression.Filter.Cmp.LIKE && !String.class.isAssignableFrom(filterColumn.getJavaType()))
             {
                 cmpFilterColumn = (Expression<? extends T>) filterColumn.as(String.class);
             }
