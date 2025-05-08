@@ -11,6 +11,7 @@ import info.nino.jpatron.request.QuerySort;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Event;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
@@ -24,16 +25,10 @@ import org.apache.commons.collections4.MultiValuedMap;
 import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.lang.reflect.Method;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -56,6 +51,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
     private static final String SORT_ASC_SIGN = "+";
     private static final Integer DEFAULT_PAGE_NUMBER = 1;
     private static final Integer DEFAULT_PAGE_SIZE = 10;
+    private static final String DEFAULT_SEARCH_ESCAPE_CHARACTERS = "%:[%],_:[_]";
 
     @Context
     ResourceInfo resourceInfo;
@@ -64,11 +60,29 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
     @EfdApiInject
     Event<EfdApiRequest> requestEvent;
 
+    @Inject
+    @ConfigProperty(name = ConstantsUtil.EFD_API_INTERFACE_SEARCH_ESCAPE_CHARACTERS, defaultValue = DEFAULT_SEARCH_ESCAPE_CHARACTERS)
+    Instance<String[]> configPropertySearchEscapeCharacters;
+
     private List<String> regexAllowedPaths = null;
+    private Map<String, String> searchEscapeCharacters = null;
 
     @PostConstruct
     public void init() {
         this.regexAllowedPaths = RegexHelper.compileRegexWildcards(".*");
+
+        if (this.configPropertySearchEscapeCharacters.isUnsatisfied()) {
+            String searchEscapeCharactersConfig = System.getProperty(ConstantsUtil.EFD_API_INTERFACE_SEARCH_ESCAPE_CHARACTERS, DEFAULT_SEARCH_ESCAPE_CHARACTERS);
+            this.initSearchEscapeCharactersMap(Arrays.stream(searchEscapeCharactersConfig.split(String.valueOf(ConstantsUtil.COMMA))).map(String::trim).toArray(String[]::new));
+        } else {
+            this.initSearchEscapeCharactersMap(this.configPropertySearchEscapeCharacters.get());
+        }
+    }
+
+    private void initSearchEscapeCharactersMap(String[] searchEscapeCharacters) {
+        this.searchEscapeCharacters = Arrays.stream(searchEscapeCharacters)
+                .map(s -> s.split(":"))
+                .collect(Collectors.toMap(s -> s[0], s -> s[1]));
     }
 
     @Override
@@ -431,7 +445,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
     private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> parseSearchExpression(
             Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> searches,
-            Class<?> clazz, String[] searchPaths, List<String> v) {
+            Class<?> clazz, String[] searchPaths, List<String> values) {
 
         Map<String, Class<?>> searchFieldsPaths = new HashMap<>();
         for (String searchPath : searchPaths) {
@@ -453,6 +467,8 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
             throw new IllegalArgumentException("Search query-param is not supported - search paths are not resolved!");
         }
 
+        values = this.escapeSearchValuesForSqlLikeQuery(values);
+
         for (Map.Entry<String, Class<?>> searchField : searchFieldsPaths.entrySet()) {
             Class<?> searchEntity = searchField.getValue();
 
@@ -465,9 +481,18 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
             if (!entitySearches.containsKey(fieldPath)) entitySearches.put(fieldPath, new HashSetValuedHashMap<>());
 
             MultiValuedMap<QueryExpression.ValueModifier, String> searchModifiers = entitySearches.get(fieldPath);
-            searchModifiers.putAll(QueryExpression.ValueModifier.LikeLR, v);
+            searchModifiers.putAll(QueryExpression.ValueModifier.LikeLR, values);
         }
 
         return searches;
+    }
+
+    private List<String> escapeSearchValuesForSqlLikeQuery(List<String> values) {
+        return values.stream().map(v -> {
+            for (Map.Entry<String, String> entry : this.searchEscapeCharacters.entrySet()) {
+                v = v.replace(entry.getKey(), entry.getValue());
+            }
+            return v;
+        }).collect(Collectors.toList());
     }
 }

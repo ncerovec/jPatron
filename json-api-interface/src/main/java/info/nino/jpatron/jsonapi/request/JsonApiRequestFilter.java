@@ -52,7 +52,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter {   //, Requ
     private static final Integer DEFAULT_PAGE_SIZE = 10;
 
     @Inject
-    @ConfigProperty(name = ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, defaultValue = BooleanUtils.TRUE)
+    @ConfigProperty(name = ConstantsUtil.JSON_API_INTERFACE_THROW_INVALID_PATH_EXCEPTION, defaultValue = BooleanUtils.TRUE)
     Instance<Boolean> configPropertyThrowInvalidPathExceptions;
 
     @Context
@@ -77,7 +77,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter {   //, Requ
     {
         if(this.configPropertyThrowInvalidPathExceptions.isUnsatisfied())
         {
-            String throwInvalidPathExceptionsConfig = System.getProperty(ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, BooleanUtils.TRUE);
+            String throwInvalidPathExceptionsConfig = System.getProperty(ConstantsUtil.JSON_API_INTERFACE_THROW_INVALID_PATH_EXCEPTION, BooleanUtils.TRUE);
             this.throwInvalidPathExceptions = BooleanUtils.toBoolean(throwInvalidPathExceptionsConfig);
         }
         else
