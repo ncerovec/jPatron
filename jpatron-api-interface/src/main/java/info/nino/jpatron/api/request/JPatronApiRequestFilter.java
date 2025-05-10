@@ -86,25 +86,28 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         }
 
         String[] searchPaths = JPatronApiAnn.searchPaths();
+        boolean pagination = JPatronApiAnn.pagination();
         boolean allowEntityPaths = JPatronApiAnn.allowEntityPaths();
         String[] allowedPaths = JPatronApiAnn.allowedPaths();
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
-        JPatronRequestContext reqContext = new JPatronRequestContext(dtoClass, searchPaths, allowEntityPaths, allowedPaths, reqQueryParams);
+        JPatronRequestContext reqContext = new JPatronRequestContext(dtoClass, searchPaths, pagination, allowEntityPaths, allowedPaths, reqQueryParams);
         ApiRequest.QueryParams queryParams = this.resolveQueryParams(reqContext);
 
         Class<?> entityClass = ReflectionHelper.resolveEntityClassFromDtoClass(dtoClass);
-        boolean pagination = JPatronApiAnn.pagination();
         boolean distinct = JPatronApiAnn.distinctDataset();
         boolean readOnly = JPatronApiAnn.readOnlyDataset();
         String[] entityGraphPaths = JPatronApiAnn.entityGraphPaths();
-        JPatronApiRequest<?> request = new JPatronApiRequest<>(entityClass, queryParams, pagination, distinct, readOnly, entityGraphPaths);
+        JPatronApiRequest<?> request = new JPatronApiRequest<>(entityClass, queryParams, distinct, readOnly, entityGraphPaths);
 
         this.requestEvent.fire(request);
     }
 
     public ApiRequest.QueryParams resolveQueryParams(JPatronRequestContext requestContext) {
 
-        ApiRequest.QueryParams requestQueryParams = new ApiRequest.QueryParams(JPatronApiRequestFilter.DEFAULT_PAGE_SIZE, JPatronApiRequestFilter.DEFAULT_PAGE_NUMBER);
+        Integer defaultPageSize = (requestContext.isPagination()) ? DEFAULT_PAGE_SIZE : null;
+        Integer defaultPageNumber = (requestContext.isPagination()) ? DEFAULT_PAGE_NUMBER : null;
+        ApiRequest.QueryParams requestQueryParams = new ApiRequest.QueryParams(defaultPageSize, defaultPageNumber);
+
         if (MapUtils.isEmpty(requestContext.getQueryParams())) {
             return requestQueryParams;
         }
