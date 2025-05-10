@@ -108,15 +108,17 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
         String[] entityGraphPaths = efdApiAnn.entityGraphPaths();
 
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
-        ApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, searchPaths);
+        ApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, searchPaths, pagination);
 
-        EfdApiRequest request = new EfdApiRequest(entityClass, queryParams, pagination, distinct, readOnly, entityGraphPaths);
+        EfdApiRequest request = new EfdApiRequest(entityClass, queryParams, distinct, readOnly, entityGraphPaths);
         this.requestEvent.fire(request);
     }
 
-    public ApiRequest.QueryParams resolveQueryParams(Class<?> dtoClass, MultivaluedMap<String, String> queryParams, String[] searchPaths) {
+    public ApiRequest.QueryParams resolveQueryParams(Class<?> dtoClass, MultivaluedMap<String, String> queryParams, String[] searchPaths, boolean pagination) {
 
-        ApiRequest.QueryParams requestQueryParams = new ApiRequest.QueryParams(EfdApiRequestFilter.DEFAULT_PAGE_SIZE, EfdApiRequestFilter.DEFAULT_PAGE_NUMBER);
+        Integer defaultPageSize = (pagination) ? DEFAULT_PAGE_SIZE : null;
+        Integer defaultPageNumber = (pagination) ? DEFAULT_PAGE_NUMBER : null;
+        ApiRequest.QueryParams requestQueryParams = new ApiRequest.QueryParams(defaultPageSize, defaultPageNumber);
 
         if (queryParams != null && !queryParams.isEmpty()) {
             for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
