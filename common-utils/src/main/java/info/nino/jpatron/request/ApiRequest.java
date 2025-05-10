@@ -22,11 +22,6 @@ public abstract class ApiRequest<T> implements Serializable {
     protected QueryParams queryParams;
 
     /**
-     * Flag if result-set should be paginated or not
-     */
-    protected boolean pagination;
-
-    /**
      * Flag if result-set should be distinct or not
      */
     protected boolean distinctDataset;
@@ -57,7 +52,6 @@ public abstract class ApiRequest<T> implements Serializable {
      * Default constructor - with all mandatory parameters
      * @param rootEntity {@link ApiRequest#rootEntity}
      * @param queryParams {@link ApiRequest#queryParams}
-     * @param pagination {@link ApiRequest#pagination}
      * @param distinct {@link ApiRequest#distinctDataset}
      * @param readOnly {@link ApiRequest#readOnlyDataset}
      * @param fetchEntityPaths {@link ApiRequest#fetchEntityPaths}
@@ -65,14 +59,12 @@ public abstract class ApiRequest<T> implements Serializable {
      */
     public ApiRequest(Class<T> rootEntity,
                       QueryParams queryParams,
-                      boolean pagination,
                       boolean distinct,
                       boolean readOnly,
                       String[] fetchEntityPaths,
                       String[] entityGraphPaths) {
         this.rootEntity = rootEntity;
         this.queryParams = queryParams;
-        this.pagination = pagination;
         this.distinctDataset = distinct;
         this.readOnlyDataset = readOnly;
         this.fetchEntityPaths = fetchEntityPaths;
@@ -109,22 +101,6 @@ public abstract class ApiRequest<T> implements Serializable {
      */
     public void setQueryParams(QueryParams queryParams) {
         this.queryParams = queryParams;
-    }
-
-    /**
-     * {@link ApiRequest#pagination}
-     * @return pagination flag
-     */
-    public boolean isPagination() {
-        return pagination;
-    }
-
-    /**
-     * {@link ApiRequest#pagination}
-     * @param pagination flag
-     */
-    public void setPagination(boolean pagination) {
-        this.pagination = pagination;
     }
 
     /**

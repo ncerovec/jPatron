@@ -52,7 +52,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter {   //, Requ
     private static final Integer DEFAULT_PAGE_SIZE = 10;
 
     @Inject
-    @ConfigProperty(name = ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, defaultValue = BooleanUtils.TRUE)
+    @ConfigProperty(name = ConstantsUtil.JSON_API_INTERFACE_THROW_INVALID_PATH_EXCEPTION, defaultValue = BooleanUtils.TRUE)
     Instance<Boolean> configPropertyThrowInvalidPathExceptions;
 
     @Context
@@ -77,7 +77,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter {   //, Requ
     {
         if(this.configPropertyThrowInvalidPathExceptions.isUnsatisfied())
         {
-            String throwInvalidPathExceptionsConfig = System.getProperty(ConstantsUtil.JSONAPI_INTERFACE_THROW_INVALID_PATH_EXCEPTION, BooleanUtils.TRUE);
+            String throwInvalidPathExceptionsConfig = System.getProperty(ConstantsUtil.JSON_API_INTERFACE_THROW_INVALID_PATH_EXCEPTION, BooleanUtils.TRUE);
             this.throwInvalidPathExceptions = BooleanUtils.toBoolean(throwInvalidPathExceptionsConfig);
         }
         else
@@ -114,24 +114,16 @@ public class JsonApiRequestFilter implements ContainerRequestFilter {   //, Requ
         String[] entityGraphPaths = jsonApiAnnot.entityGraphPaths();
 
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
-        JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, allowEntityPaths, allowedPaths);
+        JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, allowEntityPaths, pagination, allowedPaths);
 
-        JsonApiRequest jsonApiRequest = new JsonApiRequest(entityClass, queryParams, pagination, distinct, readOnly, entityGraphPaths);
-        //this.getJsonApiRequestContext().setJsonApiRequest(jsonApiRequest);
+        JsonApiRequest jsonApiRequest = new JsonApiRequest(entityClass, queryParams, distinct, readOnly, entityGraphPaths);
         this.getJsonApiRequestEvent().fire(jsonApiRequest);
     }
 
-    public JsonApiRequest.QueryParams resolveQueryParams(@Context UriInfo info, Class<?> dtoClass)
+    public JsonApiRequest.QueryParams resolveQueryParams(Class<?> dtoClass, MultivaluedMap<String, String> queryParams, boolean pagination, boolean allowEntityPaths, String[] allowedPaths)
     {
-        MultivaluedMap<String, String> queryParams = info.getQueryParameters();
-
-        return this.resolveQueryParams(dtoClass, queryParams, true, null);
-    }
-
-    public JsonApiRequest.QueryParams resolveQueryParams(Class<?> dtoClass, MultivaluedMap<String, String> queryParams, boolean allowEntityPaths, String[] allowedPaths)
-    {
-        Integer pageSize = JsonApiRequestFilter.DEFAULT_PAGE_SIZE;
-        Integer pageNumber =JsonApiRequestFilter.DEFAULT_PAGE_NUMBER;
+        Integer pageSize = (pagination) ? JsonApiRequestFilter.DEFAULT_PAGE_SIZE : null;
+        Integer pageNumber = (pagination) ? JsonApiRequestFilter.DEFAULT_PAGE_NUMBER : null;
         MultiValuedMap<Class<?>, String> includes = null;
         Map<String, Map.Entry<Class<?>, QuerySort.Direction>> sort = null;
         Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> filters = null;
