@@ -127,7 +127,7 @@ public class PageRequest
     public PageRequest(ApiRequest apiRequest)
     {
         //add page & orders
-        this((apiRequest.isPagination()) ? apiRequest.getQueryParams().getPageSize() : null, apiRequest.getQueryParams().getPageNumber());
+        this(apiRequest.getQueryParams().getPageSize(), apiRequest.getQueryParams().getPageNumber());
 
         //set distinct
         this.distinctDataset = apiRequest.isDistinctDataset();
