@@ -106,24 +106,16 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
         String[] entityGraphPaths = jsonApiAnnot.entityGraphPaths();
 
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
-        JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, allowEntityPaths, allowedPaths);
+        JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, allowEntityPaths, pagination, allowedPaths);
 
-        JsonApiRequest jsonApiRequest = new JsonApiRequest(queryParams, pagination, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
-        //this.getJsonApiRequestContext().setJsonApiRequest(jsonApiRequest);
+        JsonApiRequest jsonApiRequest = new JsonApiRequest(queryParams, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
         this.getJsonApiRequestEvent().fire(jsonApiRequest);
     }
 
-    public JsonApiRequest.QueryParams resolveQueryParams(@Context UriInfo info, Class<?> dtoClass)
+    public JsonApiRequest.QueryParams resolveQueryParams(Class<?> dtoClass, MultivaluedMap<String, String> queryParams, boolean pagination, boolean allowEntityPaths, String[] allowedPaths)
     {
-        MultivaluedMap<String, String> queryParams = info.getQueryParameters();
-
-        return this.resolveQueryParams(dtoClass, queryParams, true, null);
-    }
-
-    public JsonApiRequest.QueryParams resolveQueryParams(Class<?> dtoClass, MultivaluedMap<String, String> queryParams, boolean allowEntityPaths, String[] allowedPaths)
-    {
-        Integer pageSize = JsonApiRequestFilter.DEFAULT_PAGE_SIZE;
-        Integer pageNumber =JsonApiRequestFilter.DEFAULT_PAGE_NUMBER;
+        Integer pageSize = (pagination) ? DEFAULT_PAGE_SIZE : null;
+        Integer pageNumber = (pagination) ? DEFAULT_PAGE_NUMBER : null;
         Map<String, Map.Entry<Class<?>, String>> sort = null;
         MultiValuedMap<Class<?>, String> includes = null;
         Map<Class<?>, Map<String, MultiValuedMap<String, String>>> filters = null;
