@@ -106,7 +106,7 @@ public class JsonApiRequestFilter implements ContainerRequestFilter    //, Reque
         String[] entityGraphPaths = jsonApiAnnot.entityGraphPaths();
 
         MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
-        JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, allowEntityPaths, pagination, allowedPaths);
+        JsonApiRequest.QueryParams queryParams = this.resolveQueryParams(dtoClass, reqQueryParams, pagination, allowEntityPaths, allowedPaths);
 
         JsonApiRequest jsonApiRequest = new JsonApiRequest(queryParams, distinct, readOnly, fetchEntityPaths, entityGraphPaths);
         this.getJsonApiRequestEvent().fire(jsonApiRequest);
