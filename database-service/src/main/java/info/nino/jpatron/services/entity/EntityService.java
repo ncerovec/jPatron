@@ -25,6 +25,7 @@ import org.hibernate.jpa.HibernateHints;
 import org.hibernate.jpa.SpecHints;
 import org.hibernate.query.sqm.tree.SqmCopyContext;
 import org.hibernate.query.sqm.tree.domain.AbstractSqmSimplePath;
+import org.hibernate.query.sqm.tree.select.AbstractSqmSelectQuery;
 import org.hibernate.query.sqm.tree.select.SqmQuerySpec;
 import org.hibernate.query.sqm.tree.select.SqmSelectStatement;
 
@@ -54,9 +55,8 @@ public interface EntityService<E>
     String LABEL_PATHS_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
 
     List<QueryExpression.CompareOperator> booleanComparators = Arrays.asList(QueryExpression.CompareOperator.TRUE, QueryExpression.CompareOperator.FALSE);
-    List<QueryExpression.CompareOperator> subqueryComparators = Arrays.asList(QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NotEACH, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.NotEXCEPT);
-    List<QueryExpression.CompareOperator> nonValueComparators = Arrays.asList(QueryExpression.CompareOperator.IsNULL, QueryExpression.CompareOperator.IsNotNULL, QueryExpression.CompareOperator.IsEMPTY, QueryExpression.CompareOperator.IsNotEMPTY);
-    List<QueryExpression.CompareOperator> valueComparators = Arrays.asList(QueryExpression.CompareOperator.EQ, QueryExpression.CompareOperator.NEQ, QueryExpression.CompareOperator.LIKE, QueryExpression.CompareOperator.GT, QueryExpression.CompareOperator.LT, QueryExpression.CompareOperator.GToE, QueryExpression.CompareOperator.LToE, QueryExpression.CompareOperator.IN, QueryExpression.CompareOperator.NotIN, QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NotEACH, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.NotEXCEPT);
+    List<QueryExpression.CompareOperator> subqueryComparators = Arrays.asList(QueryExpression.CompareOperator.ANY, QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NONE, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.EXACTLY);
+    List<QueryExpression.CompareOperator> nonValueComparators = Arrays.asList(QueryExpression.CompareOperator.TRUE, QueryExpression.CompareOperator.FALSE, QueryExpression.CompareOperator.IsNULL, QueryExpression.CompareOperator.IsNotNULL, QueryExpression.CompareOperator.IsEMPTY, QueryExpression.CompareOperator.IsNotEMPTY);
 
     //@PersistenceContext(unitName = "primary")
     //EntityManager em = null;
@@ -1018,7 +1018,7 @@ public interface EntityService<E>
             }
 
             //convert filter values to comparison type
-            if(EntityService.valueComparators.contains(comparator))    //TODO: add subqueryComparators to valueComparators in order to parse values
+            if(!EntityService.nonValueComparators.contains(comparator))
             {
                 if(filter.getValueModifier() != null) filter.setValue(EsUtil.getModValues(filter));
 
@@ -1189,76 +1189,78 @@ public interface EntityService<E>
                     break;
                 }
 
-                case EACH: //every/each listed
-                //case EVERY:
+                case ANY: //any listed item - 'IN' alternative with subquery
                 {
+                    Predicate subqueryPredicates = subquery.getRestriction();
                     CriteriaBuilder.In<Comparable<?>> subqueryIn = cb.in(cmpFilterColumn);
                     Arrays.stream(filter.getValue()).forEach(subqueryIn::value);
+                    subqueryPredicates = PredicateUtil.combinePredicates(cb, subqueryPredicates, subqueryIn, QueryExpression.LogicOperator.AND);
+                    subquery.where(subqueryPredicates);
 
-                    List<Expression<?>> subqueryPredicates = new ArrayList<>(subquery.getRestriction().getExpressions());
-                    subqueryPredicates.add(subqueryIn);
-                    subquery.where(subqueryPredicates.toArray(new Predicate[]{}));
+                    p = cb.greaterThan(subquery,  cb.literal(0L));
+                    break;
+                }
+
+                case EACH: //every/each listed
+                {
+                    Predicate subqueryPredicates = subquery.getRestriction();
+                    CriteriaBuilder.In<Comparable<?>> subqueryIn = cb.in(cmpFilterColumn);
+                    Arrays.stream(filter.getValue()).forEach(subqueryIn::value);
+                    subqueryPredicates = PredicateUtil.combinePredicates(cb, subqueryPredicates, subqueryIn, QueryExpression.LogicOperator.AND);
+                    subquery.where(subqueryPredicates);
 
                     p = cb.equal(subquery, cb.literal(filter.getValue().length));
                     break;
                 }
 
-                case NotEACH: //none listed
-                //case NotEVERY:
+                case NONE: //none listed - !NONE
                 {
+                    Predicate subqueryPredicates = subquery.getRestriction();
                     CriteriaBuilder.In<Comparable<?>> subqueryIn = cb.in(cmpFilterColumn);
                     Arrays.stream(filter.getValue()).forEach(subqueryIn::value);
-
-                    List<Expression<?>> subqueryPredicates = new ArrayList<>(subquery.getRestriction().getExpressions());
-                    subqueryPredicates.add(subqueryIn);
-                    subquery.where(subqueryPredicates.toArray(new Predicate[]{}));
+                    subqueryPredicates = PredicateUtil.combinePredicates(cb, subqueryPredicates, subqueryIn, QueryExpression.LogicOperator.AND);
+                    subquery.where(subqueryPredicates);
 
                     p = cb.equal(subquery, cb.literal(0L));
                     break;
                 }
 
-                case EXCEPT: //any except listed (at least one)
-                //case AnyEXCEPT:
-                //case SomeEXCEPT:
+                case EXCEPT: //any except listed (at least one) - 'NotIN' alternative with subquery
                 {
+                    Predicate subqueryPredicates = subquery.getRestriction();
                     CriteriaBuilder.In<Comparable<?>> subqueryIn = cb.in(cmpFilterColumn);
                     Arrays.stream(filter.getValue()).forEach(subqueryIn::value);
-
-                    List<Expression<?>> subqueryPredicates = new ArrayList<>(subquery.getRestriction().getExpressions());
-                    subqueryPredicates.add(subqueryIn.not());
-                    subquery.where(subqueryPredicates.toArray(new Predicate[]{}));
+                    subqueryPredicates = PredicateUtil.combinePredicates(cb, subqueryPredicates, subqueryIn.not(), QueryExpression.LogicOperator.AND);
+                    subquery.where(subqueryPredicates);
 
                     p = cb.greaterThan(subquery, cb.literal(0L));
                     break;
                 }
 
-                case NotEXCEPT: //none except listed
-                //case NoneEXCEPT:
+                case EXACTLY: //none except listed - !NONE
                 {
+                    Subquery<Long> subqueryTotal = query.subquery(Long.class);
+                    Core.replicateQuery(subqueryTotal, subquery);
+
+                    Predicate subqueryPredicates = subquery.getRestriction();
                     CriteriaBuilder.In<Comparable<?>> subqueryIn = cb.in(cmpFilterColumn);
                     Arrays.stream(filter.getValue()).forEach(subqueryIn::value);
+                    subqueryPredicates = PredicateUtil.combinePredicates(cb, subqueryPredicates, subqueryIn, QueryExpression.LogicOperator.AND);
+                    subquery.where(subqueryPredicates);
 
-                    List<Expression<?>> subqueryPredicates = new ArrayList<>(subquery.getRestriction().getExpressions());
-                    subqueryPredicates.add(subqueryIn.not());
-                    subquery.where(subqueryPredicates.toArray(new Predicate[]{}));
-
-                    p = cb.equal(subquery, cb.literal(0L));
+                    p = cb.and(
+                            cb.equal(subqueryTotal, cb.literal(filter.getValue().length)),
+                            cb.equal(subquery, cb.literal(filter.getValue().length))
+                    );
                     break;
                 }
 
                 //case ONLY: IN + NotEXCEPT
                 //case EXACTLY: EACH + NotEXCEPT
-
-                //case ANY: //'IN' comparator alternative with subquery
-                //{
-                //    Subquery<Long> subquery = this.generateCountSubquery(cb, query, filterColumn, filter);
-                //    p = cb.greaterThan(subquery, cb.literal(0L));
-                //    break;
-                //}
-
-                //case ALL: //TODO: Implement cb.all(subquery) method!
-                //case EXISTS: //TODO: Implement cb.exists(subquery) method!
-                //case NotEXISTS: //TODO: Implement cb.exists(subquery).not() method!
+                //case ANY: //TODO: check cb.any(subquery) method!
+                //case ALL: //TODO: check cb.all(subquery) method!
+                //case EXISTS: //TODO: check cb.exists(subquery) method!
+                //case NotEXISTS: //TODO: check cb.exists(subquery).not() method!
                 //NOTICE case ANY/SOME: IN comparator alternatives (cb.any(subquery)/cb.some(subquery))
                 //NOTICE example: https://www.logicbig.com/tutorials/java-ee-tutorial/jpa/criteria-api-all-any-some-methods.html
                 default: throw new NotImplementedException(String.format("Missing Predicate implementation for '%s' comparator!", comparator));
@@ -1332,7 +1334,7 @@ public interface EntityService<E>
         {
             CriteriaQuery<E> query = cb.createQuery(orgQuery.getResultType());
 
-            return Core.replicateQuery(query, orgQuery);
+            return (CriteriaQuery<E>) Core.replicateQuery(query, orgQuery);
         }
 
         private static <E> CriteriaQuery<Tuple> createTupleQuery(CriteriaBuilder cb, Class<E> clazz)
@@ -1347,7 +1349,7 @@ public interface EntityService<E>
         {
             CriteriaQuery<Tuple> query = cb.createTupleQuery();
 
-            return Core.replicateQuery(query, orgQuery);
+            return (CriteriaQuery<Tuple>) Core.replicateQuery(query, orgQuery);
         }
 
         //WARNING (Hibernate v6): issues with reusing (copying) Predicates in CriteriaQuery where & having methods
@@ -1356,7 +1358,7 @@ public interface EntityService<E>
         //https://stackoverflow.com/questions/74962038/hibernate-6-error-already-registered-a-copy-sqmbasicvaluedsimplepathfullyqua
         //https://discourse.hibernate.org/t/hibernate-6-already-registered-a-copy/7641/2
         //https://stackoverflow.com/questions/76316577/org-hibernate-sql-ast-sqltreecreationexception-could-not-locate-tablegroup-mo
-        private static <T> CriteriaQuery<T> replicateQuery(CriteriaQuery<T> newQuery, CriteriaQuery<?> orgQuery)
+        private static <T> AbstractQuery<T> replicateQuery(AbstractQuery<T> newQuery, AbstractQuery<?> orgQuery)
         {
             //NOTICE: replicate all FromPaths (Root & Join) from original CriteriaQuery
             final SqmCopyContext pathContext = SqmCopyContext.simpleContext();
@@ -1364,13 +1366,13 @@ public interface EntityService<E>
 
             //WARNING: "queryContext" must be different from "pathContext" to work when different CriteriaQuery from/select is used
             final SqmCopyContext queryContext = SqmCopyContext.simpleContext();
-            SqmQuerySpec orgQuerySpec = ((SqmSelectStatement) orgQuery).getQuerySpec();
-            ((SqmSelectStatement) newQuery).setQueryPart(orgQuerySpec.copy(queryContext));
+            SqmQuerySpec orgQuerySpec = ((AbstractSqmSelectQuery) orgQuery).getQuerySpec();
+            ((AbstractSqmSelectQuery) newQuery).setQueryPart(orgQuerySpec.copy(queryContext));
 
             return newQuery;
         }
 
-        private static void replicateFromRoots(SqmCopyContext copyContext, CriteriaQuery<?> query, Set<Root<?>> roots)
+        private static void replicateFromRoots(SqmCopyContext copyContext, AbstractQuery<?> query, Set<Root<?>> roots)
         {
             for(Root<?> r : roots)
             {
