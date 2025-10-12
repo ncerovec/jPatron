@@ -16,7 +16,7 @@ import java.util.LinkedList;
 public class QueryExpression {
 
     public enum LogicOperator { AND, OR; }
-    public enum CompareOperator { TRUE, FALSE, IsNULL, IsNotNULL, IsEMPTY, IsNotEMPTY, EQ, NEQ, LIKE, GT, LT, GToE, LToE, IN, NotIN, EACH, NotEACH, EXCEPT, NotEXCEPT; }
+    public enum CompareOperator { TRUE, FALSE, IsNULL, IsNotNULL, IsEMPTY, IsNotEMPTY, EQ, NEQ, LIKE, GT, LT, GToE, LToE, IN, NotIN, ANY, EACH, NONE, EXCEPT, EXACTLY; }
     public enum Function { COUNT, COUNT_DISTINCT, SUM, AVG, MIN, MAX; }
     public enum ValueModifier { NONE, LikeL, LikeR, LikeLR, SPLIT, SplitLikeL, SplitLikeR, SplitLikeLR; }
 
