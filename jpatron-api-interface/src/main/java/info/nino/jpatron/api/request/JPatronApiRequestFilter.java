@@ -635,12 +635,14 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
             //replaced: metaFuncs.addAll(function, labelColumnPaths);
             CollectionUtils.emptyIfNull(labelColumnPaths).forEach(labelColumnPath -> {
                 if(StringUtils.isNotBlank(labelColumnPath)) {
-                    Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(requestContext, labelColumnPath);
-                    if (labelField == null) {
-                        throw new IllegalStateException(String.format("Meta Value '%s' - label field path '%s' not resolved!", valueColumnPath, labelColumnPath));
-                    }
+                    Arrays.stream(labelColumnPath.split(QUERY_VALUE_SEPARATOR)).forEach(labelColumn -> {
+                        Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(requestContext, labelColumn.trim());
+                        if (labelField == null) {
+                            throw new IllegalStateException(String.format("Meta Value '%s' - label field path '%s' not resolved!", valueColumnPath, labelColumn));
+                        }
+                    });
 
-                    metaFuncs.put(function, labelField.getValue());
+                    metaFuncs.put(function, labelColumnPath);
                 } else {
                     metaFuncs.put(function, null);
                 }

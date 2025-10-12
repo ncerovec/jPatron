@@ -27,7 +27,6 @@ import org.hibernate.query.sqm.tree.SqmCopyContext;
 import org.hibernate.query.sqm.tree.domain.AbstractSqmSimplePath;
 import org.hibernate.query.sqm.tree.select.AbstractSqmSelectQuery;
 import org.hibernate.query.sqm.tree.select.SqmQuerySpec;
-import org.hibernate.query.sqm.tree.select.SqmSelectStatement;
 
 import java.lang.reflect.*;
 import java.math.BigDecimal;
@@ -51,8 +50,6 @@ import java.util.stream.Stream;
 public interface EntityService<E>
 {
     Logger logger = Logger.getLogger(EntityService.class.getName());
-
-    String LABEL_PATHS_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
 
     List<QueryExpression.CompareOperator> booleanComparators = Arrays.asList(QueryExpression.CompareOperator.TRUE, QueryExpression.CompareOperator.FALSE);
     List<QueryExpression.CompareOperator> subqueryComparators = Arrays.asList(QueryExpression.CompareOperator.ANY, QueryExpression.CompareOperator.EACH, QueryExpression.CompareOperator.NONE, QueryExpression.CompareOperator.EXCEPT, QueryExpression.CompareOperator.EXACTLY);
@@ -447,7 +444,7 @@ public interface EntityService<E>
             CriteriaBuilder cb = em.getCriteriaBuilder();
             CriteriaQuery<Tuple> aggQuery = Core.replicateTupleQuery(cb, query);
 
-            Path[] labelColumns = null;
+            Path<?>[] labelColumns = null;
             Expression<?>[] selectColumns = null;
             if(metaVQ.getValueColumnEntityPath() != null)
             {
@@ -455,10 +452,11 @@ public interface EntityService<E>
                 Path<? extends Number> valueColumn = Core.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, metaVQ.getValueColumnEntityPath());
                 //Path<?> labelColumn = this.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, metaVQ.getEntity(), metaVQ.getLabelColumnPath());
 
-                if(metaVQ.getLabelColumnEntityPath() != null)
+                if(CollectionUtils.isNotEmpty(metaVQ.getLabelColumnEntityPaths()))
                 {
-                    String[] labelColumnsPaths = metaVQ.getLabelColumnEntityPath().getValue().split(EntityService.LABEL_PATHS_SEPARATOR);
-                    labelColumns = Arrays.stream(labelColumnsPaths).map(l -> Core.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, new ImmutablePair<>(metaVQ.getLabelColumnEntityPath().getKey(), l.trim()))).toArray(Path[]::new);
+                    labelColumns = metaVQ.getLabelColumnEntityPaths().stream()
+                            .map(l -> Core.findOrGenerateFieldJoinPath(aggQuery.getRoots(), clazz, l))
+                            .toArray(Path[]::new);
                     //labelColumn = Arrays.stream(labelColumns).map(l -> (Expression<String>) l).reduce(cb::concat).orElse(null);
                     //.reduce(cb.literal(StringUtils.EMPTY),                                      //identity
                     //(concat, nextLabel) -> cb.concat(concat, (Expression<String>) nextLabel),   //accumulator
@@ -466,7 +464,7 @@ public interface EntityService<E>
                 }
 
                 QueryExpression.Function function = metaVQ.getFunc();
-                if(function == null) throw new RuntimeException(String.format("AggQuery (%s) - QueryExpression.Func must NOT be null!", EsUtil.getMetaValueKey(metaVQ)));
+                if(function == null) throw new IllegalArgumentException(String.format("AggQuery (%s) - QueryExpression.Func must NOT be null!", EsUtil.getMetaValueKey(metaVQ)));
                 switch(function)
                 {
                     case COUNT:
@@ -517,7 +515,7 @@ public interface EntityService<E>
                 //String joinPathString = Helper.getPathWithoutLastItem(metaVQ.getValueColumnEntityPath().getValue());
                 //Path<?> path = Core.findFromPath(aggQuery.getRoots(), metaVQ.getValueColumnEntityPath().getKey(), joinPathString);
                 Path<?> path = Core.findEntityRootPath(aggQuery.getRoots(), metaVQ.getRootEntity());
-                if(path == null) throw new RuntimeException(String.format("AggQuery - Path NOT FOUND for ENTITY Class: %s!", metaVQ.getRootEntity()));
+                if(path == null) throw new IllegalStateException(String.format("AggQuery - Path NOT FOUND for ENTITY Class: %s!", metaVQ.getRootEntity()));
                 selectColumns = new Expression[] { cb.countDistinct(path) };
             }
 
@@ -537,7 +535,7 @@ public interface EntityService<E>
                 aggQuery.where(orgPredicate);
             }
 
-            //TODO verify: incorrect aggregation value (duplicate root Entity values with one-to-many relations)?
+            //TODO check: incorrect aggregation value (duplicate root Entity values with one-to-many relations)?
             if(labelColumns != null)
             {
                 aggQuery.groupBy(labelColumns);
@@ -566,9 +564,13 @@ public interface EntityService<E>
 
             Expression<?>[] selectColumns = null;
             Path<?> valueColumn = Core.findOrGenerateFieldJoinPath(distQuery.getRoots(), clazz, metaVQ.getValueColumnEntityPath());
-            if(metaVQ.getLabelColumnEntityPath() != null)
+            if(CollectionUtils.isNotEmpty(metaVQ.getLabelColumnEntityPaths()))
             {
-                Path<?> labelColumn = Core.findOrGenerateFieldJoinPath(distQuery.getRoots(), clazz, metaVQ.getLabelColumnEntityPath());
+                if (metaVQ.getLabelColumnEntityPaths().size() > 1) {
+                    throw new IllegalStateException(String.format("DistinctQuery (%s) - only ONE label column is allowed!", EsUtil.getDistinctValueKey(metaVQ)));
+                }
+
+                Path<?> labelColumn = Core.findOrGenerateFieldJoinPath(distQuery.getRoots(), clazz, metaVQ.getLabelColumnEntityPaths().get(0));
                 selectColumns = new Expression[] { valueColumn, labelColumn };
             }
             else
@@ -758,7 +760,7 @@ public interface EntityService<E>
                 Map<Object, Object> aggValues = columnAggs.map(a ->
                 {
                     int labelStartIndex = (agg.getFunc() == QueryExpression.Function.AVG) ? 2 : 1;
-                    String labelsConcat = (a.getElements().size() > labelStartIndex) ? a.getElements().subList(labelStartIndex, a.getElements().size()).stream().map(te -> String.valueOf(a.get(te))).collect(Collectors.joining()) : "value";
+                    String labelsConcat = (a.getElements().size() > labelStartIndex) ? a.getElements().subList(labelStartIndex, a.getElements().size()).stream().map(te -> String.valueOf(a.get(te))).collect(Collectors.joining(";")) : "value";
 
                     Number valueCount = (agg.getFunc() == QueryExpression.Function.AVG) ? (Number) a.get(1) : 1;
                     return new AbstractMap.SimpleEntry<String, Map.Entry<Number, Number>>(labelsConcat, new AbstractMap.SimpleEntry<>((Number) a.get(0), valueCount));
@@ -1963,7 +1965,7 @@ public interface EntityService<E>
             {
                 key = distinctQuery.getValueColumnEntityPath().getKey().getSimpleName();
                 if(distinctQuery.getValueColumnEntityPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(distinctQuery.getValueColumnEntityPath().getValue());
-                if(distinctQuery.getLabelColumnEntityPath() != null) key += " and " + distinctQuery.getLabelColumnEntityPath().getValue();
+                if(distinctQuery.getLabelColumnEntityPaths() != null) key += " and " + distinctQuery.getLabelColumnEntityPaths().stream().map(Pair::getValue).filter(Objects::nonNull).collect(Collectors.joining(" and "));
 
                 key = WordUtils.capitalize(key.replaceAll("[\\._]", " "));
                 key = StringUtils.uncapitalize(StringUtils.deleteWhitespace(key));
@@ -1981,7 +1983,7 @@ public interface EntityService<E>
                 key = metaQuery.getValueColumnEntityPath().getKey().getSimpleName();
                 if(metaQuery.getFunc() != null) key += " " + StringUtils.lowerCase(metaQuery.getFunc().name());
                 if(metaQuery.getValueColumnEntityPath() != null) key += " " + ReflectionHelper.getFieldNameFromPath(metaQuery.getValueColumnEntityPath().getValue());
-                if(metaQuery.getLabelColumnEntityPath() != null) key += " by " + metaQuery.getLabelColumnEntityPath().getValue().replaceAll(EntityService.LABEL_PATHS_SEPARATOR, " and ");
+                if(metaQuery.getLabelColumnEntityPaths() != null) key += " by " + metaQuery.getLabelColumnEntityPaths().stream().map(Pair::getValue).filter(Objects::nonNull).collect(Collectors.joining(" and "));
                 if(metaQuery.getFilters() != null) for(QueryExpression.Filter f : metaQuery.getFilters()) key += " " + f.getName();
 
                 key = WordUtils.capitalize(key.replaceAll("[\\._]", " "));

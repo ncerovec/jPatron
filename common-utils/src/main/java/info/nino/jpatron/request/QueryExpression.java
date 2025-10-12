@@ -1,12 +1,16 @@
 package info.nino.jpatron.request;
 
 import com.google.common.base.Joiner;
+import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.Arrays;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * QueryExpression is Object-Oriented Query Language metamodel for EntityService Query Engine
@@ -15,18 +19,20 @@ import java.util.LinkedList;
 //TODO fix: QueryExpression suffers from "telescoping constructors problem"
 public class QueryExpression {
 
+    public static final String LABEL_PATHS_SEPARATOR = String.valueOf(ConstantsUtil.COMMA);
+
     public enum LogicOperator { AND, OR; }
     public enum CompareOperator { TRUE, FALSE, IsNULL, IsNotNULL, IsEMPTY, IsNotEMPTY, EQ, NEQ, LIKE, GT, LT, GToE, LToE, IN, NotIN, ANY, EACH, NONE, EXCEPT, EXACTLY; }
     public enum Function { COUNT, COUNT_DISTINCT, SUM, AVG, MIN, MAX; }
     public enum ValueModifier { NONE, LikeL, LikeR, LikeLR, SPLIT, SplitLikeL, SplitLikeR, SplitLikeLR; }
 
-    private String name;                                    //arbitrary name for QueryExpression (meta-value fields naming)
-    private Class<?> rootEntity;                            //query root entity (base for value/label paths)
-    private Pair<Class<?>, String> labelColumnEntityPath;   //pair of entity & column name OR path with label
-    private Pair<Class<?>, String> valueColumnEntityPath;   //pair of entity & column name OR path with value
-    private Function function = Function.COUNT;             //aggregation function used with value-column (default: Func.COUNT)
-    private Filter<?>[] filters;                            //additional query filters
-    private boolean distinct = false;                       //distinct aggregation values (default: false)
+    private String name;                                                //arbitrary name for QueryExpression (meta-value fields naming)
+    private Class<?> rootEntity;                                        //query root entity (base for value/label paths)
+    private Pair<Class<?>, String> valueColumnEntityPath;               //pair of entity & column name/path with value
+    private List<Pair<Class<?>, String>> labelColumnEntityPaths;        //map of entity & column name/path with labels
+    private Function function = Function.COUNT;                         //aggregation function used with value-column (default: Func.COUNT)
+    private Filter<?>[] filters;                                        //additional query filters
+    private boolean distinct = false;                                   //distinct aggregation values (default: false)
 
     public QueryExpression(Class<?> rootEntity) {
         this.rootEntity = rootEntity;
@@ -40,14 +46,14 @@ public class QueryExpression {
     public QueryExpression(Class<?> rootEntity, String valueColumnPath, String labelColumnPath) {
         this.rootEntity = rootEntity;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, labelColumnPath, true);
+        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
     }
 
     public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, String labelColumnPath) {
         this.rootEntity = rootEntity;
         this.name = name;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, labelColumnPath, true);
+        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
     }
 
     public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function) {
@@ -67,7 +73,7 @@ public class QueryExpression {
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, labelColumnPath, true);
+        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
     }
 
     public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, Function function, String labelColumnPath) {
@@ -75,7 +81,7 @@ public class QueryExpression {
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, labelColumnPath, true);
+        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
     }
 
     public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function, Filter... filters) {
@@ -97,7 +103,7 @@ public class QueryExpression {
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, labelColumnPath, true);
+        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
         this.filters = filters;
     }
 
@@ -106,8 +112,14 @@ public class QueryExpression {
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, labelColumnPath, true);
+        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
         this.filters = filters;
+    }
+
+    private List<Pair<Class<?>, String>> mapLabelColumnEntityPathsFromCsvString(String labelColumnPath) {
+        return Arrays.stream(labelColumnPath.split(LABEL_PATHS_SEPARATOR))
+                .map(label -> ReflectionHelper.findEntityFieldByPath(rootEntity, label.trim(), true))
+                .collect(Collectors.toList());
     }
 
     public String getName() {
@@ -118,8 +130,9 @@ public class QueryExpression {
         return rootEntity;
     }
 
-    public Pair<Class<?>, String> getLabelColumnEntityPath() {
-        return labelColumnEntityPath;
+    public List<Pair<Class<?>, String>> getLabelColumnEntityPaths()
+    {
+        return labelColumnEntityPaths;
     }
 
     public Pair<Class<?>, String> getValueColumnEntityPath() {
@@ -144,12 +157,13 @@ public class QueryExpression {
 
     @Override
     public String toString() {
+        String labelPaths = (this.getLabelColumnEntityPaths() != null) ? this.getLabelColumnEntityPaths().stream().map(Pair::getValue).filter(Objects::nonNull).collect(Collectors.joining(", ")) : null;
         String filtersString = (this.getFilters() != null) ? Joiner.on(" AND ").skipNulls().join(this.getFilters()) : null;
         return String.format("(%s) <%s> %s:%s - FILTERS(%s)",
                 this.getValueColumnEntityPath().getKey().getSimpleName(),
                 this.getFunc(),
                 this.getValueColumnEntityPath().getValue(),
-                this.getLabelColumnEntityPath().getValue(),
+                labelPaths,
                 filtersString);
     }
 
