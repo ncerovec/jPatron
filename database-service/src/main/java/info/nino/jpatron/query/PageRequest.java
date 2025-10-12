@@ -5,6 +5,7 @@ import info.nino.jpatron.request.QuerySort;
 
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -91,7 +92,7 @@ public class PageRequest<T>
      */
     public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber)
     {
-        this.rootEntity = rootEntity;
+        this.rootEntity = Optional.ofNullable(rootEntity).orElseThrow(() -> new NullPointerException("Root Entity class cannot be null"));
         this.pageSize = pageSize;
         this.pageNumber = pageNumber;
     }

@@ -4,15 +4,16 @@ import info.nino.jpatron.efd.annotiation.EfdApiInject;
 import info.nino.jpatron.efd.request.EfdApiRequest;
 import jakarta.enterprise.event.Observes;
 
-public abstract class EfdApiEndpoint {
+public abstract class EfdApiEndpoint<T> {
 
     //@Inject
     //@EfdApiInject    //Implementation for RestEasy reactive (io.quarkus:quarkus-rest)
-    protected EfdApiRequest efdApiRequest;
+    protected EfdApiRequest<T> efdApiRequest;
 
     //NOTICE: https://quarkus.io/guides/cdi#events-and-observers
     //Implementation for RestEasy classic (io.quarkus:quarkus-resteasy)
-    public void onTaskCompleted(@Observes @EfdApiInject EfdApiRequest efdApiRequest) {
-        this.efdApiRequest = efdApiRequest;
+    public void onTaskCompleted(@Observes @EfdApiInject EfdApiRequest<?> efdApiRequest) {
+        //noinspection unchecked
+        this.efdApiRequest = (EfdApiRequest<T>) efdApiRequest;
     }
 }
