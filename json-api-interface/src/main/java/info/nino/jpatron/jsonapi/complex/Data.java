@@ -15,7 +15,7 @@ import java.util.Map;
 public class Data<T> implements java.io.Serializable {
 
     @JsonProperty("id")
-    private Number id;
+    private Number id;  //make optional of type Object
 
     //@ApiModelProperty(readOnly = true)
     @JsonProperty(value = "type", access = JsonProperty.Access.READ_ONLY)

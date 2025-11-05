@@ -3,7 +3,7 @@ package info.nino.jpatron.request;
 import org.apache.commons.collections4.MultiValuedMap;
 
 import java.io.Serializable;
-import java.util.Map;
+import java.util.*;
 
 /**
  *  Generic abstract class for API request implementations
@@ -173,29 +173,49 @@ public abstract class ApiRequest<T> implements Serializable {
      */
     public static class QueryParams implements Serializable {
 
-        protected Integer pageSize;
-        protected Integer pageNumber;
+        private Integer pageSize;
+        private Integer pageNumber;
 
-        //SortFieldPath : Entity, SortDirection
-        protected Map<String, Map.Entry<Class<?>, QuerySort.Direction>> sort;
+        //list of singular filters  (replaces legacyFilters property)
+        private LinkedHashSet<QuerySort> sorts = new LinkedHashSet<>();
 
         //Entity -> IncludeEntityPath(s)
-        protected MultiValuedMap<Class<?>, String> includes;
+        private MultiValuedMap<Class<?>, String> includes;
+
+        //list of singular filters  (replaces legacyFilters property)
+        private List<QueryExpression.Filter<?>> filters = new ArrayList<>();
 
         //compound/complex filter in nested object hierarchy
-        protected QueryExpression.CompoundFilter compoundFilter;
+        private QueryExpression.CompoundFilter compoundFilter;
 
+        //list of singular searches (replaces legacySearches property)
+        private List<QueryExpression.Search> searches = new ArrayList<>();
+
+        //set of requested distinct-value columns (replaces legacyDistinctValues property)
+        private Set<QueryExpression> distinctColumns = new HashSet<>();
+
+        //set of requested meta-value columns (replaces legacyMetaValues property)
+        private Set<QueryExpression> metaColumns = new HashSet<>();
+
+        @Deprecated
+        //SortFieldPath : Entity, SortDirection
+        private Map<String, Map.Entry<Class<?>, QuerySort.Direction>> legacySort;
+
+        @Deprecated
         //Entity -> FilterFieldPath -> Operator : FilterValue(s)
-        protected Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> filters;
+        private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> legacyFilters;
 
+        @Deprecated
         //Entity -> SearchFieldPath -> Modifier : SearchValue(s)
-        protected Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> searches;
+        private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> legacySearches;
 
+        @Deprecated
         //Entity -> KeyFieldPath : LabelFieldPath(s)
-        protected Map<Class<?>, MultiValuedMap<String, String>> distinctValues;
+        private Map<Class<?>, MultiValuedMap<String, String>> legacyDistinctValues;
 
+        @Deprecated
         //Entity -> ValueFieldPath -> Function : LabelFieldPath(s)
-        protected Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> metaValues;
+        private Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> legacyMetaValues;
 
         public QueryParams(Integer pageSize, Integer pageNumber) {
             this.pageSize = pageSize;
@@ -218,12 +238,14 @@ public abstract class ApiRequest<T> implements Serializable {
             this.pageNumber = pageNumber;
         }
 
-        public Map<String, Map.Entry<Class<?>, QuerySort.Direction>> getSort() {
-            return sort;
+        public LinkedHashSet<QuerySort> getSorts()
+        {
+            return sorts;
         }
 
-        public void setSort(Map<String, Map.Entry<Class<?>, QuerySort.Direction>> sort) {
-            this.sort = sort;
+        public void setSorts(LinkedHashSet<QuerySort> sorts)
+        {
+            this.sorts = sorts;
         }
 
         public MultiValuedMap<Class<?>, String> getIncludes() {
@@ -234,6 +256,16 @@ public abstract class ApiRequest<T> implements Serializable {
             this.includes = includes;
         }
 
+        public List<QueryExpression.Filter<?>> getFilters()
+        {
+            return filters;
+        }
+
+        public void setFilters(List<QueryExpression.Filter<?>> filters)
+        {
+            this.filters = filters;
+        }
+
         public QueryExpression.CompoundFilter getCompoundFilter() {
             return compoundFilter;
         }
@@ -242,50 +274,108 @@ public abstract class ApiRequest<T> implements Serializable {
             this.compoundFilter = compoundFilter;
         }
 
-        public Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> getFilters() {
-            return filters;
-        }
-
-        public void setFilters(
-                Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> filters) {
-            this.filters = filters;
-        }
-
-        public Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> getSearches() {
+        public List<QueryExpression.Search> getSearches()
+        {
             return searches;
         }
 
-        public void setSearches(
-                Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> searches) {
+        public void setSearches(List<QueryExpression.Search> searches)
+        {
             this.searches = searches;
         }
 
-        public Map<Class<?>, MultiValuedMap<String, String>> getDistinctValues() {
-            return distinctValues;
+        public Set<QueryExpression> getDistinctColumns()
+        {
+            return distinctColumns;
         }
 
-        public void setDistinctValues(
-                Map<Class<?>, MultiValuedMap<String, String>> distinctValues) {
-            this.distinctValues = distinctValues;
+        public void setDistinctColumns(Set<QueryExpression> distinctColumns)
+        {
+            this.distinctColumns = distinctColumns;
         }
 
-        public Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> getMetaValues() {
-            return metaValues;
+        public Set<QueryExpression> getMetaColumns()
+        {
+            return metaColumns;
         }
 
-        public void setMetaValues(
-                Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> metaValues) {
-            this.metaValues = metaValues;
+        public void setMetaColumns(Set<QueryExpression> metaColumns)
+        {
+            this.metaColumns = metaColumns;
         }
 
-        public interface CompounderEnum {
-            QueryExpression.LogicOperator getLogicOperator();
-            String getValue();
+        @Deprecated
+        public Map<String, Map.Entry<Class<?>, QuerySort.Direction>> getLegacySort() {
+            return legacySort;
         }
 
-        public interface ComparatorEnum {
-            QueryExpression.CompareOperator getCompareOperator();
-            String getValue();
+        @Deprecated
+        public void setLegacySort(Map<String, Map.Entry<Class<?>, QuerySort.Direction>> legacySort) {
+            this.legacySort = legacySort;
         }
+
+        @Deprecated
+        public Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> getLegacyFilters() {
+            return legacyFilters;
+        }
+
+        @Deprecated
+        public void setLegacyFilters(
+                Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.CompareOperator, String>>> legacyFilters) {
+            this.legacyFilters = legacyFilters;
+        }
+
+        @Deprecated
+        public Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> getLegacySearches() {
+            return legacySearches;
+        }
+
+        @Deprecated
+        public void setLegacySearches(
+                Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.ValueModifier, String>>> legacySearches) {
+            this.legacySearches = legacySearches;
+        }
+
+        @Deprecated
+        public Map<Class<?>, MultiValuedMap<String, String>> getLegacyDistinctValues() {
+            return legacyDistinctValues;
+        }
+
+        @Deprecated
+        public void setLegacyDistinctValues(
+                Map<Class<?>, MultiValuedMap<String, String>> legacyDistinctValues) {
+            this.legacyDistinctValues = legacyDistinctValues;
+        }
+
+        @Deprecated
+        public Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> getLegacyMetaValues() {
+            return legacyMetaValues;
+        }
+
+        @Deprecated
+        public void setLegacyMetaValues(
+                Map<Class<?>, Map<String, MultiValuedMap<QueryExpression.Function, String>>> legacyMetaValues) {
+            this.legacyMetaValues = legacyMetaValues;
+        }
+    }
+
+    public interface SortDirectionEnum {
+        QuerySort.Direction getSortDirection();
+        String getValue();
+    }
+
+    public interface CompounderEnum {
+        QueryExpression.LogicOperator getLogicOperator();
+        String getValue();
+    }
+
+    public interface ComparatorEnum {
+        QueryExpression.CompareOperator getCompareOperator();
+        String getValue();
+    }
+
+    public interface FunctionEnum {
+        QueryExpression.Function getFunction();
+        String getValue();
     }
 }

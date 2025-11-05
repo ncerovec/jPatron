@@ -1,6 +1,7 @@
 package info.nino.jpatron.api.request;
 
 import info.nino.jpatron.helpers.RegexHelper;
+import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.core.MultivaluedMap;
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -13,20 +14,20 @@ public class JPatronRequestContext {
     private boolean pagination;
     private boolean allowEntityPaths;
     private List<String> regexAllowedPaths;
-    private MultivaluedMap<String, String> queryParams;
+    private ContainerRequestContext containerRequest;
 
     public JPatronRequestContext(Class<?> clazz,
                                  String[] searchPaths,
                                  boolean pagination,
                                  boolean allowEntityPaths,
                                  String[] allowedPaths,
-                                 MultivaluedMap<String, String> queryParams) {
+                                 ContainerRequestContext containerRequest) {
         this.clazz = clazz;
-        this.queryParams = queryParams;
         this.searchPaths = searchPaths;
         this.pagination = pagination;
         this.allowEntityPaths = allowEntityPaths;
         this.regexAllowedPaths = (ArrayUtils.isNotEmpty(allowedPaths)) ? RegexHelper.compileRegexWildcards(allowedPaths) : null;
+        this.containerRequest = containerRequest;
     }
 
     public Class<?> getClazz() {
@@ -50,7 +51,8 @@ public class JPatronRequestContext {
         return regexAllowedPaths;
     }
 
-    public MultivaluedMap<String, String> getQueryParams() {
-        return queryParams;
+    public ContainerRequestContext getContainerRequest()
+    {
+        return containerRequest;
     }
 }

@@ -6,7 +6,7 @@ import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.DateTimeFormatUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.pagination.Page;
-import info.nino.jpatron.query.PageRequest;
+import info.nino.jpatron.query.EntityPageRequest;
 import info.nino.jpatron.request.QueryExpression;
 import info.nino.jpatron.request.QuerySort;
 import jakarta.persistence.*;
@@ -126,7 +126,7 @@ public interface EntityService<E>
      * @param request (PageRequest) with query parameters (filters, pagination, sorting, etc...)
      * @return Page object with list of target Entity objects from DB
      */
-    default Page<E> dataQuery(PageRequest<E> request)
+    default Page<E> dataQuery(EntityPageRequest<E> request)
     {
         Class<E> entity = this.getEntityClass();
         EntityManager em = this.getBaseInstance().resolveEntityManager();
@@ -139,7 +139,7 @@ public interface EntityService<E>
      * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
      * @return Map (requested properties) of Maps (distinct-values &amp; their keys/counterparts) containing distinct-values of requested properties
      */
-    default Map<String, Map<Object, Object>> distinctQuery(PageRequest<E> request)
+    default Map<String, Map<Object, Object>> distinctQuery(EntityPageRequest<E> request)
     {
         Class<E> entity = this.getEntityClass();
         EntityManager em = this.getBaseInstance().resolveEntityManager();
@@ -170,7 +170,7 @@ public interface EntityService<E>
      * @param request (PageRequest) with query parameters (filters, etc... - identical to dataQuery)
      * @return Map (requested properties) of Maps (distinct-values &amp; their keys/counterparts) containing distinct-values of requested properties
      */
-    default Map<String, Map<Object, Object>> metaQuery(PageRequest<E> request)
+    default Map<String, Map<Object, Object>> metaQuery(EntityPageRequest<E> request)
     {
         Class<E> entity = this.getEntityClass();
         EntityManager em = this.getBaseInstance().resolveEntityManager();
@@ -339,7 +339,7 @@ public interface EntityService<E>
             return (Long) countTuple.get(0).get(0);
         }
 
-        private Page<E> dataQuery(EntityManager em, Class<E> entity, PageRequest<E> request)
+        private Page<E> dataQuery(EntityManager em, Class<E> entity, EntityPageRequest<E> request)
         {
             CriteriaBuilder cb = em.getCriteriaBuilder();
             CriteriaQuery<E> query = Core.createEntityQuery(cb, entity);
@@ -396,7 +396,7 @@ public interface EntityService<E>
             return page;
         }
 
-        private Page<E> pageQuery(EntityManager em, CriteriaQuery<E> query, Class<E> entity, PageRequest<E> request)
+        private Page<E> pageQuery(EntityManager em, CriteriaQuery<E> query, Class<E> entity, EntityPageRequest<E> request)
         {
             TypedQuery<E> dataQuery = em.createQuery(query);
             //TypedQuery<Tuple> dataQuery = em.createQuery(query);
@@ -689,7 +689,7 @@ public interface EntityService<E>
             return entityGraphHint;
         }
 
-        private void extendEntityGraphBySortEntities(PageRequest<E> request)
+        private void extendEntityGraphBySortEntities(EntityPageRequest<E> request)
         {
             List<String> entityGraphPaths = new ArrayList<>(Arrays.asList(ArrayUtils.nullToEmpty(request.getEntityGraphPaths())));
 

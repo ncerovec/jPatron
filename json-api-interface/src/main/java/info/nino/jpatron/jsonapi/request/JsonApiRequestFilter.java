@@ -18,7 +18,6 @@ import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.container.ResourceInfo;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MultivaluedMap;
-import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.Provider;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MultiValuedMap;
@@ -362,12 +361,12 @@ public class JsonApiRequestFilter implements ContainerRequestFilter {   //, Requ
         }
 
         JsonApiRequest.QueryParams requestQueryParams = new JsonApiRequest.QueryParams(pageSize, pageNumber);
-        if(sort != null) requestQueryParams.setSort(sort);
+        if(sort != null) requestQueryParams.setLegacySort(sort);
         if(includes != null) requestQueryParams.setIncludes(includes);
-        if(filters != null) requestQueryParams.setFilters(filters);
-        if(searches != null) requestQueryParams.setSearches(searches);
-        if(distinctValues != null) requestQueryParams.setDistinctValues(distinctValues);
-        if(metaValues != null) requestQueryParams.setMetaValues(metaValues);
+        if(filters != null) requestQueryParams.setLegacyFilters(filters);
+        if(searches != null) requestQueryParams.setLegacySearches(searches);
+        if(distinctValues != null) requestQueryParams.setLegacyDistinctValues(distinctValues);
+        if(metaValues != null) requestQueryParams.setLegacyMetaValues(metaValues);
 
         return requestQueryParams;
     }

@@ -12,7 +12,7 @@ import java.util.Set;
  * Main Entity Service request object
  * Contains parameters used for data/distinct/meta queries
  */
-public class PageRequest<T>
+public class EntityPageRequest<T>
 {
     /**
      * Requested root Entity of the PageRequest
@@ -52,7 +52,7 @@ public class PageRequest<T>
     /**
      * Set of sorting parameters of QuerySort type
      */
-    private Set<QuerySort> sorts = new LinkedHashSet<>();
+    private LinkedHashSet<QuerySort> sorts = new LinkedHashSet<>();
 
     /**
      * EntityService query-filters
@@ -79,7 +79,7 @@ public class PageRequest<T>
      * Constructor for PageRequest (data-service) with custom properties
      * @param rootEntity requested Entity result
      */
-    public PageRequest(Class<T> rootEntity)
+    public EntityPageRequest(Class<T> rootEntity)
     {
         this.rootEntity = rootEntity;
     }
@@ -90,7 +90,7 @@ public class PageRequest<T>
      * @param pageSize requested page size
      * @param pageNumber requested page number
      */
-    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber)
+    public EntityPageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber)
     {
         this.rootEntity = Optional.ofNullable(rootEntity).orElseThrow(() -> new NullPointerException("Root Entity class cannot be null"));
         this.pageSize = pageSize;
@@ -105,7 +105,7 @@ public class PageRequest<T>
      * @param distinct true/false flag for distinct-list of the result list
      * @param readOnly true/false flag for the read-only result list
      */
-    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly)
+    public EntityPageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly)
     {
         this(rootEntity, pageSize, pageNumber);
         this.distinctDataset = distinct;
@@ -119,7 +119,7 @@ public class PageRequest<T>
      * @param pageNumber requested number of the result page
      * @param sort set of sorting parameters of String type (e.g. "-name")
      */
-    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, Set<String> sort)
+    public EntityPageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, Set<String> sort)
     {
         this(rootEntity, pageSize, pageNumber);
         if(sort != null) sort.forEach(s -> this.addSort(rootEntity, s));
@@ -134,7 +134,7 @@ public class PageRequest<T>
      * @param readOnly true/false flag for the read-only result list
      * @param sorts set of sorting parameters of Sort type
      */
-    public PageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly, Set<QuerySort> sorts)
+    public EntityPageRequest(Class<T> rootEntity, Integer pageSize, Integer pageNumber, boolean distinct, boolean readOnly, LinkedHashSet<QuerySort> sorts)
     {
         this(rootEntity, pageSize, pageNumber);
         this.distinctDataset = distinct;

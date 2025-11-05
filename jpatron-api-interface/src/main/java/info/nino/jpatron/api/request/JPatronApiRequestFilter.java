@@ -1,7 +1,10 @@
 package info.nino.jpatron.api.request;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import info.nino.jpatron.api.annotiation.JPatronApi;
 import info.nino.jpatron.api.annotiation.JPatronApiInject;
+import info.nino.jpatron.api.request.payload.JPatronRequestPayload;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.request.ApiRequest;
@@ -11,6 +14,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -25,13 +29,20 @@ import org.apache.commons.collections4.multimap.HashSetValuedHashMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static info.nino.jpatron.request.QueryExpression.LABEL_PATHS_SEPARATOR;
 
 /**
  * jPatron API request filter implementation
@@ -66,13 +77,16 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
     @JPatronApiInject
     Event<JPatronApiRequest<?>> requestEvent;
 
+    private final ObjectMapper mapper = new ObjectMapper();
+
     @PostConstruct
     public void init() {
 
     }
 
     @Override
-    public void filter(ContainerRequestContext requestContext) {
+    public void filter(ContainerRequestContext requestContext) throws JsonProcessingException
+    {
         Method resourceMethod = this.resourceInfo.getResourceMethod();
         JPatronApi JPatronApiAnn = resourceMethod.getAnnotation(JPatronApi.class);
         if (JPatronApiAnn == null) {
@@ -89,9 +103,14 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         boolean pagination = JPatronApiAnn.pagination();
         boolean allowEntityPaths = JPatronApiAnn.allowEntityPaths();
         String[] allowedPaths = JPatronApiAnn.allowedPaths();
-        MultivaluedMap<String, String> reqQueryParams = requestContext.getUriInfo().getQueryParameters();
-        JPatronRequestContext reqContext = new JPatronRequestContext(dtoClass, searchPaths, pagination, allowEntityPaths, allowedPaths, reqQueryParams);
-        ApiRequest.QueryParams queryParams = this.resolveQueryParams(reqContext);
+
+        JPatronRequestContext reqContext = new JPatronRequestContext(dtoClass, searchPaths, pagination, allowEntityPaths, allowedPaths, requestContext);
+        ApiRequest.QueryParams queryParams = switch (requestContext.getRequest().getMethod()) {
+            case HttpMethod.GET -> this.resolveQueryParams(reqContext);
+            case HttpMethod.POST -> this.resolvePayloadParams(reqContext);
+            default -> throw new IllegalStateException("HttpMethod '%s' not supported by jpatron-api-interface!"
+                    .formatted(requestContext.getRequest().getMethod()));
+        };
 
         Class<?> entityClass = ReflectionHelper.resolveEntityClassFromDtoClass(dtoClass);
         boolean distinct = JPatronApiAnn.distinctDataset();
@@ -102,20 +121,40 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         this.requestEvent.fire(request);
     }
 
-    public ApiRequest.QueryParams resolveQueryParams(JPatronRequestContext requestContext) {
+    private ApiRequest.QueryParams resolvePayloadParams(JPatronRequestContext requestContext) throws JsonProcessingException
+    {
+        InputStream entityStream = requestContext.getContainerRequest().getEntityStream();
+        String requestPayloadBody = new BufferedReader(
+                new InputStreamReader(entityStream, StandardCharsets.UTF_8))
+                .lines()
+                .reduce("", (accumulator, actual) -> accumulator + actual);
 
-        Integer defaultPageSize = (requestContext.isPagination()) ? DEFAULT_PAGE_SIZE : null;
-        Integer defaultPageNumber = (requestContext.isPagination()) ? DEFAULT_PAGE_NUMBER : null;
-        ApiRequest.QueryParams requestQueryParams = new ApiRequest.QueryParams(defaultPageSize, defaultPageNumber);
+        // IMPORTANT: Reset the entity stream so it can be read again later
+        ByteArrayInputStream resetStream = new ByteArrayInputStream(requestPayloadBody.getBytes(StandardCharsets.UTF_8));
+        requestContext.getContainerRequest().setEntityStream(resetStream);
 
-        if (MapUtils.isEmpty(requestContext.getQueryParams())) {
+        JPatronRequestPayload requestPayload = mapper.readValue(requestPayloadBody, JPatronRequestPayload.class);
+        ApiRequest.QueryParams requestQueryParams = this.initializeDefaultApiRequestQueryParams(requestContext);
+
+        for(JPatronRequestPayload.JPatronMeta meta : requestPayload.metas()) {
+            requestQueryParams.getMetaColumns().add(new QueryExpression(meta.name(), requestContext.getClazz(), meta.valuePath(), meta.function(), meta.labelPaths()));
+        }
+
+        return requestQueryParams;
+    }
+
+    private ApiRequest.QueryParams resolveQueryParams(JPatronRequestContext requestContext) {
+        ApiRequest.QueryParams requestQueryParams = this.initializeDefaultApiRequestQueryParams(requestContext);
+
+        MultivaluedMap<String, String> queryParams = requestContext.getContainerRequest().getUriInfo().getQueryParameters();
+        if (MapUtils.isEmpty(queryParams)) {
             return requestQueryParams;
         }
 
         String jpatronApiQueryParamRegex = "^([^\\[\\]\\s]+)(?:\\[([^\\[\\]\\s]+)\\])?(?:\\[([^\\[\\]\\s]+)\\])?";
         Pattern queryParamRegex = Pattern.compile(jpatronApiQueryParamRegex);
 
-        for (Map.Entry<String, List<String>> entry : requestContext.getQueryParams().entrySet()) {
+        for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
             String key = entry.getKey();
             List<String> value = entry.getValue();
             Matcher queryParamMatcher = queryParamRegex.matcher(key);
@@ -159,7 +198,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                     }
 
                     var sort = this.parseSortExpression(requestContext, value);
-                    requestQueryParams.setSort(sort);
+                    requestQueryParams.setLegacySort(sort);
                     break;
                 }
 
@@ -185,8 +224,8 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                     }
 
                     QueryExpression.CompareOperator cmp = (param != null) ? QueryExpression.CompareOperator.valueOf(param) : DEFAULT_FILTER_COMPARATOR;
-                    var filters = this.parsePropertyFilter(requestContext, requestQueryParams.getFilters(), property, cmp, value);
-                    requestQueryParams.setFilters(filters);
+                    var filters = this.parsePropertyFilter(requestContext, requestQueryParams.getLegacyFilters(), property, cmp, value);
+                    requestQueryParams.setLegacyFilters(filters);
                     break;
                 }
 
@@ -208,29 +247,35 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
                     }
 
                     QueryExpression.ValueModifier mod = (param != null) ? QueryExpression.ValueModifier.valueOf(param) : DEFAULT_SEARCH_MODIFIER;
-                    var searches = this.parseSearchExpression(requestContext, requestQueryParams.getSearches(), property, mod, value);
-                    requestQueryParams.setSearches(searches);
+                    var searches = this.parseSearchExpression(requestContext, requestQueryParams.getLegacySearches(), property, mod, value);
+                    requestQueryParams.setLegacySearches(searches);
                     break;
                 }
 
                 //Distinct query params
                 case DISTINCT: {
-                    var distinctValues = this.parseDistinctQueryParam(requestContext, requestQueryParams.getDistinctValues(), property, value);
-                    requestQueryParams.setDistinctValues(distinctValues);
+                    var distinctValues = this.parseDistinctQueryParam(requestContext, requestQueryParams.getLegacyDistinctValues(), property, value);
+                    requestQueryParams.setLegacyDistinctValues(distinctValues);
                     break;
                 }
 
                 //Meta query params
                 case META: {
                     QueryExpression.Function func = (param != null) ? QueryExpression.Function.valueOf(param) : DEFAULT_META_FUNCTION;
-                    var metaValues = this.parseMetaQueryParam(requestContext, requestQueryParams.getMetaValues(), property, func, value);
-                    requestQueryParams.setMetaValues(metaValues);
+                    var metaValues = this.parseMetaQueryParam(requestContext, requestQueryParams.getLegacyMetaValues(), property, func, value);
+                    requestQueryParams.setLegacyMetaValues(metaValues);
                     break;
                 }
             }
         }
 
         return requestQueryParams;
+    }
+
+    private ApiRequest.QueryParams initializeDefaultApiRequestQueryParams(JPatronRequestContext requestContext) {
+        Integer defaultPageSize = (requestContext.isPagination()) ? DEFAULT_PAGE_SIZE : null;
+        Integer defaultPageNumber = (requestContext.isPagination()) ? DEFAULT_PAGE_NUMBER : null;
+        return new ApiRequest.QueryParams(defaultPageSize, defaultPageNumber);
     }
 
     private Pair<Class<?>, String> findEntityFieldByPath(JPatronRequestContext requestContext, String path) {
@@ -604,7 +649,7 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
             CollectionUtils.emptyIfNull(labelColumnPaths).forEach(labelColumnPath -> {
                 if(StringUtils.isNotBlank(labelColumnPath)) {
                     Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(requestContext, labelColumnPath);
-                    if (labelField == null) {
+                    if (labelField == null) {   //theoretically unreachable
                         throw new IllegalStateException(String.format("Distinct Value '%s' - label field path '%s' not resolved!", keyColumnPath, labelColumnPath));
                     }
                     //NOTICE allowed: if(keyField.getKey() != labelField.getKey()) throw new RuntimeException(String.format("Distinct KEY Entity (%s) different from LABEL Entity (%s)!", keyField.getKey(), labelField.getKey()));
@@ -636,12 +681,11 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
             CollectionUtils.emptyIfNull(labelColumnPaths).forEach(labelColumnPath -> {
                 if(StringUtils.isNotBlank(labelColumnPath)) {
                     Arrays.stream(labelColumnPath.split(QUERY_VALUE_SEPARATOR)).forEach(labelColumn -> {
-                        Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(requestContext, labelColumn.trim());
-                        if (labelField == null) {
+                        Map.Entry<Class<?>, String> labelField = this.findEntityFieldByPath(requestContext, labelColumn.trim()); //column paths validation
+                        if (labelField == null) {   //theoretically unreachable
                             throw new IllegalStateException(String.format("Meta Value '%s' - label field path '%s' not resolved!", valueColumnPath, labelColumn));
                         }
                     });
-
                     metaFuncs.put(function, labelColumnPath);
                 } else {
                     metaFuncs.put(function, null);

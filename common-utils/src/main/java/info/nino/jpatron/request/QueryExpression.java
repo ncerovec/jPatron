@@ -43,17 +43,17 @@ public class QueryExpression {
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
     }
 
-    public QueryExpression(Class<?> rootEntity, String valueColumnPath, String labelColumnPath) {
+    public QueryExpression(Class<?> rootEntity, String valueColumnPath, String... labelColumnPath) {
         this.rootEntity = rootEntity;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
+        this.labelColumnEntityPaths = this.mapLabelColumnEntityPaths(labelColumnPath);
     }
 
-    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, String labelColumnPath) {
+    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, String... labelColumnPath) {
         this.rootEntity = rootEntity;
         this.name = name;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
+        this.labelColumnEntityPaths = this.mapLabelColumnEntityPaths(labelColumnPath);
     }
 
     public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function) {
@@ -69,29 +69,31 @@ public class QueryExpression {
         this.function = function;
     }
 
-    public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function, String labelColumnPath) {
+    public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function, String... labelColumnPath) {
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
+        this.labelColumnEntityPaths = this.mapLabelColumnEntityPaths(labelColumnPath);
     }
 
-    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, Function function, String labelColumnPath) {
+    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, Function function, String... labelColumnPath) {
         this.name = name;
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
+        this.labelColumnEntityPaths = this.mapLabelColumnEntityPaths(labelColumnPath);
     }
 
-    public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function, Filter... filters) {
+    @Deprecated
+    public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function, Filter<?>... filters) {
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
         this.filters = filters;
     }
 
-    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, Function function, Filter... filters) {
+    @Deprecated
+    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, Function function, Filter<?>... filters) {
         this.name = name;
         this.rootEntity = rootEntity;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
@@ -99,26 +101,26 @@ public class QueryExpression {
         this.filters = filters;
     }
 
-    public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function, String labelColumnPath, Filter... filters) {
+    public QueryExpression(Class<?> rootEntity, String valueColumnPath, Function function, Filter<?>[] filters, String... labelColumnPath) {
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
+        this.labelColumnEntityPaths = this.mapLabelColumnEntityPaths(labelColumnPath);
         this.filters = filters;
     }
 
-    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, Function function, String labelColumnPath, Filter... filters) {
+    public QueryExpression(String name, Class<?> rootEntity, String valueColumnPath, Function function, Filter<?>[] filters, String... labelColumnPath) {
         this.name = name;
         this.rootEntity = rootEntity;
         this.function = function;
         this.valueColumnEntityPath = ReflectionHelper.findEntityFieldByPath(rootEntity, valueColumnPath, true);
-        this.labelColumnEntityPaths = mapLabelColumnEntityPathsFromCsvString(labelColumnPath);
+        this.labelColumnEntityPaths = this.mapLabelColumnEntityPaths(labelColumnPath);
         this.filters = filters;
     }
 
-    private List<Pair<Class<?>, String>> mapLabelColumnEntityPathsFromCsvString(String labelColumnPath) {
-        return Arrays.stream(labelColumnPath.split(LABEL_PATHS_SEPARATOR))
-                .map(label -> ReflectionHelper.findEntityFieldByPath(rootEntity, label.trim(), true))
+    private List<Pair<Class<?>, String>> mapLabelColumnEntityPaths(String... labelColumnPath) {
+        return Arrays.stream(labelColumnPath)
+                .map(labelPath -> ReflectionHelper.findEntityFieldByPath(rootEntity, labelPath, true))
                 .collect(Collectors.toList());
     }
 
@@ -320,6 +322,23 @@ public class QueryExpression {
                     this.getColumnEntityPath().getKey() != null ? this.getColumnEntityPath().getKey().getSimpleName() : null,
                     this.getCompareOperator(),
                     Arrays.toString(this.getValue()));
+        }
+    }
+
+    public static class Search extends Filter<String> {
+        public Search(Class<?> rootEntity, String columnPath, String... value)
+        {
+            super(rootEntity, columnPath, CompareOperator.LIKE, value);
+        }
+
+        public Search(Class<?> rootEntity, String columnPath, ValueModifier valueModifier, String... value)
+        {
+            super(rootEntity, columnPath, CompareOperator.LIKE, valueModifier, value);
+        }
+
+        public Search(String name, Class<?> rootEntity, String columnPath, String... value)
+        {
+            super(name, rootEntity, columnPath, CompareOperator.LIKE, value);
         }
     }
 }

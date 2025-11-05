@@ -11,16 +11,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static info.nino.jpatron.request.QueryExpression.LABEL_PATHS_SEPARATOR;
+
 public final class RequestBuilder<T> {
 
-    private final PageRequest<T> pageRequest;
+    private final EntityPageRequest<T> request;
 
-    private RequestBuilder(PageRequest<T> pageRequest) {
-        this.pageRequest = pageRequest;
+    private RequestBuilder(EntityPageRequest<T> request) {
+        this.request = request;
     }
 
-    public PageRequest<T> getPageRequest() {
-        return pageRequest;
+    public EntityPageRequest<T> getPageRequest() {
+        return request;
     }
 
     public static <V extends Comparable<? super V>> QueryExpression.Filter<V> createNewFilter(RequestBuilder<?> requestBuilder,
@@ -55,12 +57,12 @@ public final class RequestBuilder<T> {
     public static <T> RequestBuilder<T> init(Class<T> rootEntity,
                                              Integer pageSize,
                                              Integer pageNumber) {
-        PageRequest<T> pageRequest = new PageRequest<>(rootEntity, pageSize, pageNumber);
-        return new RequestBuilder<T>(pageRequest);
+        EntityPageRequest<T> request = new EntityPageRequest<>(rootEntity, pageSize, pageNumber);
+        return new RequestBuilder<T>(request);
     }
 
-    public static <T> RequestBuilder<T> init(PageRequest<T> pageRequest) {
-        return new RequestBuilder<T>(pageRequest);
+    public static <T> RequestBuilder<T> init(EntityPageRequest<T> request) {
+        return new RequestBuilder<T>(request);
     }
 
     /**
@@ -76,15 +78,26 @@ public final class RequestBuilder<T> {
         //requestBuilder.addFetchEntityPaths(apiRequest.getFetchEntityPaths());
         requestBuilder.addEntityGraphPaths(apiRequest.getEntityGraphPaths());
 
-        MapUtils.emptyIfNull(apiRequest.getQueryParams().getSort()).forEach((fieldPath, clazzDirectionEntry) -> {
+        //NEW: sorts
+        apiRequest.getQueryParams().getSorts().forEach(sort ->
+                requestBuilder.addSorting(sort.getColumnEntityPath().getValue(), sort.getDirection())
+        );
+
+        //LEGACY: sorts
+        MapUtils.emptyIfNull(apiRequest.getQueryParams().getLegacySort()).forEach((fieldPath, clazzDirectionEntry) -> {
             requestBuilder.addSorting(fieldPath, clazzDirectionEntry.getValue());
         });
 
+        //NEW: compound-filters
         if (apiRequest.getQueryParams().getCompoundFilter() != null) {
             requestBuilder.addCompoundFilter(QueryExpression.LogicOperator.AND, apiRequest.getQueryParams().getCompoundFilter());
         }
 
-        MapUtils.emptyIfNull(apiRequest.getQueryParams().getFilters()).forEach((clazz, filterPaths) -> {
+        //NEW: filters
+        requestBuilder.addAndFilter(apiRequest.getQueryParams().getFilters().toArray(QueryExpression.Filter[]::new));
+
+        //LEGACY: filters
+        MapUtils.emptyIfNull(apiRequest.getQueryParams().getLegacyFilters()).forEach((clazz, filterPaths) -> {
             filterPaths.forEach((fieldPath, filterValues) -> {
                 filterValues.asMap().forEach((compareOperator, values) -> {
                     requestBuilder.addAndFilter(fieldPath, compareOperator, values.toArray(new Comparable[]{}));
@@ -92,8 +105,12 @@ public final class RequestBuilder<T> {
             });
         });
 
+        //NEW: searches
+        requestBuilder.addOrFilter(apiRequest.getQueryParams().getSearches().toArray(QueryExpression.Search[]::new));
+
+        //LEGACY: searches
         List<QueryExpression.Filter<?>> searchFilters = new ArrayList<>();
-        MapUtils.emptyIfNull(apiRequest.getQueryParams().getSearches()).forEach((clazz, searchFields) -> {
+        MapUtils.emptyIfNull(apiRequest.getQueryParams().getLegacySearches()).forEach((clazz, searchFields) -> {
             searchFields.forEach((fieldPath, searchValues) -> {
                 searchValues.asMap().forEach((valueModifier, values) -> {
                     QueryExpression.CompareOperator compareOperator = QueryExpression.CompareOperator.LIKE;
@@ -108,7 +125,11 @@ public final class RequestBuilder<T> {
             requestBuilder.addCompoundFilter(QueryExpression.LogicOperator.AND, searchCompound);
         }
 
-        MapUtils.emptyIfNull(apiRequest.getQueryParams().getDistinctValues()).forEach((clazz, distinctFields) -> {
+        //NEW: distinct-columns
+        requestBuilder.getPageRequest().getDistinctColumns().addAll(apiRequest.getQueryParams().getDistinctColumns());
+
+        //LEGACY: distinct-columns
+        MapUtils.emptyIfNull(apiRequest.getQueryParams().getLegacyDistinctValues()).forEach((clazz, distinctFields) -> {
             distinctFields.asMap().forEach((keyField, labelFields) -> {
                 labelFields.forEach(labelField -> {
                     if(StringUtils.isNotBlank(labelField)) {
@@ -120,14 +141,20 @@ public final class RequestBuilder<T> {
             });
         });
 
-        MapUtils.emptyIfNull(apiRequest.getQueryParams().getMetaValues()).forEach((clazz, metaFields) -> {
+        //NEW: meta-columns
+        requestBuilder.getPageRequest().getMetaColumns().addAll(apiRequest.getQueryParams().getMetaColumns());
+
+        //LEGACY: meta-columns
+        MapUtils.emptyIfNull(apiRequest.getQueryParams().getLegacyMetaValues()).forEach((clazz, metaFields) -> {
             metaFields.forEach((valueField, labelValues) -> {
                 labelValues.asMap().forEach((function, labelFields) -> {
-                    labelFields.forEach(labelField -> {
-                        if(StringUtils.isNotBlank(labelField)) {
-                            requestBuilder.addMeta(labelField, function, valueField);
+                    labelFields.forEach(labelFieldPath -> {
+                        if(StringUtils.isNotBlank(labelFieldPath)) {
+                            String[] labelFieldPaths = Arrays.stream(labelFieldPath.split(LABEL_PATHS_SEPARATOR))
+                                    .map(String::trim).toArray(String[]::new);
+                            requestBuilder.addMeta(valueField, function, labelFieldPaths);
                         } else {
-                            requestBuilder.addMeta(function, valueField);
+                            requestBuilder.addMeta(valueField, function);
                         }
                     });
                 });
@@ -138,45 +165,45 @@ public final class RequestBuilder<T> {
     }
 
     public RequestBuilder<T> setDistinct(boolean distinct) {
-        this.pageRequest.setDistinctDataset(distinct);
+        this.request.setDistinctDataset(distinct);
         return this;
     }
 
     public RequestBuilder<T> setReadOnly(boolean readOnly) {
-        this.pageRequest.setReadOnlyDataset(readOnly);
+        this.request.setReadOnlyDataset(readOnly);
         return this;
     }
 
     public RequestBuilder<T> clearEntityGraphPaths() {
-        this.pageRequest.setEntityGraphPaths(null);
+        this.request.setEntityGraphPaths(null);
         return this;
     }
 
     public RequestBuilder<T> addEntityGraphPaths(String... entityGraphPaths) {
-        var newEntityGraphPaths = ArrayUtils.addAll(this.pageRequest.getEntityGraphPaths(), entityGraphPaths);
-        this.pageRequest.setEntityGraphPaths(newEntityGraphPaths);
+        var newEntityGraphPaths = ArrayUtils.addAll(this.request.getEntityGraphPaths(), entityGraphPaths);
+        this.request.setEntityGraphPaths(newEntityGraphPaths);
         return this;
     }
 
     public RequestBuilder<T> addSorting(String sortFieldPath, QuerySort.Direction direction) {
-        this.pageRequest.addSort(this.pageRequest.getRootEntity(), sortFieldPath, direction);
+        this.request.addSort(this.request.getRootEntity(), sortFieldPath, direction);
         return this;
     }
 
     public RequestBuilder<T> addSorting(String... sorts) {
-        Arrays.stream(sorts).forEach(sort -> this.pageRequest.addSort(this.pageRequest.getRootEntity(), sort));
+        Arrays.stream(sorts).forEach(sort -> this.request.addSort(this.request.getRootEntity(), sort));
         return this;
     }
 
     public RequestBuilder<T> setRootCompoundFilterLogicOperator(QueryExpression.LogicOperator logicOperator) {
-        this.pageRequest.getQueryFilters().setLogicOperator(logicOperator);
+        this.request.getQueryFilters().setLogicOperator(logicOperator);
         return this;
     }
 
     public <V extends Comparable<? super V>> RequestBuilder<T> addAndFilter(String fieldPath,
                                                                             QueryExpression.CompareOperator compareOperator,
                                                                             V... value) {
-        QueryExpression.Filter<V> newFilter = new QueryExpression.Filter<>(this.pageRequest.getRootEntity(), fieldPath, compareOperator, value);
+        QueryExpression.Filter<V> newFilter = new QueryExpression.Filter<>(this.request.getRootEntity(), fieldPath, compareOperator, value);
         this.addFilter(QueryExpression.LogicOperator.AND, newFilter);  //conjunction with existing filters
         return this;
     }
@@ -184,7 +211,7 @@ public final class RequestBuilder<T> {
     public <V extends Comparable<? super V>> RequestBuilder<T> addOrFilter(String fieldPath,
                                                                            QueryExpression.CompareOperator compareOperator,
                                                                            V... value) {
-        QueryExpression.Filter<V> newFilter = new QueryExpression.Filter<>(this.pageRequest.getRootEntity(), fieldPath, compareOperator, value);
+        QueryExpression.Filter<V> newFilter = new QueryExpression.Filter<>(this.request.getRootEntity(), fieldPath, compareOperator, value);
         this.addFilter(QueryExpression.LogicOperator.OR, newFilter);  //disjunction with existing filters
         return this;
     }
@@ -193,7 +220,7 @@ public final class RequestBuilder<T> {
                                                                             QueryExpression.CompareOperator compareOperator,
                                                                             QueryExpression.ValueModifier valueModifier,
                                                                             V... value) {
-        QueryExpression.Filter<V> newFilter = new QueryExpression.Filter<>(this.pageRequest.getRootEntity(), fieldPath, compareOperator, valueModifier, value);
+        QueryExpression.Filter<V> newFilter = new QueryExpression.Filter<>(this.request.getRootEntity(), fieldPath, compareOperator, valueModifier, value);
         this.addFilter(QueryExpression.LogicOperator.AND, newFilter);  //conjunction with existing filters
         return this;
     }
@@ -202,7 +229,7 @@ public final class RequestBuilder<T> {
                                                                            QueryExpression.CompareOperator compareOperator,
                                                                            QueryExpression.ValueModifier valueModifier,
                                                                            V... value) {
-        QueryExpression.Filter<V> newFilter = new QueryExpression.Filter<>(this.pageRequest.getRootEntity(), fieldPath, compareOperator, valueModifier, value);
+        QueryExpression.Filter<V> newFilter = new QueryExpression.Filter<>(this.request.getRootEntity(), fieldPath, compareOperator, valueModifier, value);
         this.addFilter(QueryExpression.LogicOperator.OR, newFilter);  //disjunction with existing filters
         return this;
     }
@@ -219,7 +246,7 @@ public final class RequestBuilder<T> {
 
     public <V extends Comparable<? super V>> RequestBuilder<T> addFilter(QueryExpression.LogicOperator logicOperator,
                                                                          QueryExpression.Filter<V>... newFilters) {
-        var rootCompoundFilter = this.pageRequest.getQueryFilters();
+        var rootCompoundFilter = this.request.getQueryFilters();
 
         if (rootCompoundFilter.getLogicOperator() != logicOperator) {
             if (rootCompoundFilter.isEmpty()) {
@@ -230,7 +257,7 @@ public final class RequestBuilder<T> {
                 newRootCompoundFilter.addCompoundFilters(rootCompoundFilter);
 
                 //replace current with correct concatenation (conjunction/disjunction) of root+new
-                this.pageRequest.setQueryFilters(newRootCompoundFilter);
+                this.request.setQueryFilters(newRootCompoundFilter);
             }
         } else {
             rootCompoundFilter.addFilters(newFilters);
@@ -241,7 +268,7 @@ public final class RequestBuilder<T> {
 
     public RequestBuilder<T> addCompoundFilter(QueryExpression.LogicOperator logicOperator,
                                                QueryExpression.CompoundFilter... newCompoundFilters) {
-        var rootCompoundFilter = this.pageRequest.getQueryFilters();
+        var rootCompoundFilter = this.request.getQueryFilters();
 
         if (rootCompoundFilter.getLogicOperator() != logicOperator) {
             if (rootCompoundFilter.isEmpty()) {
@@ -252,7 +279,7 @@ public final class RequestBuilder<T> {
                 newRootCompoundFilter.addCompoundFilters(rootCompoundFilter);
 
                 //replace current with correct concatenation (conjunction/disjunction) of root+new
-                this.pageRequest.setQueryFilters(newRootCompoundFilter);
+                this.request.setQueryFilters(newRootCompoundFilter);
             }
         } else {
             rootCompoundFilter.addCompoundFilters(newCompoundFilters);
@@ -262,44 +289,44 @@ public final class RequestBuilder<T> {
     }
 
     public RequestBuilder<T> addDistinct(String valueFieldPath) {
-        QueryExpression newDistinctExpression = new QueryExpression(this.pageRequest.getRootEntity(), valueFieldPath);
-        this.pageRequest.getDistinctColumns().add(newDistinctExpression);
+        QueryExpression newDistinctExpression = new QueryExpression(this.request.getRootEntity(), valueFieldPath);
+        this.request.getDistinctColumns().add(newDistinctExpression);
         return this;
     }
 
     public RequestBuilder<T> addDistinct(String valueFieldPath, String labelFieldPath) {
-        QueryExpression newDistinctExpression = new QueryExpression(this.pageRequest.getRootEntity(), valueFieldPath, labelFieldPath);
-        this.pageRequest.getDistinctColumns().add(newDistinctExpression);
+        QueryExpression newDistinctExpression = new QueryExpression(this.request.getRootEntity(), valueFieldPath, labelFieldPath);
+        this.request.getDistinctColumns().add(newDistinctExpression);
         return this;
     }
 
     public RequestBuilder<T> addDistinct(String name, String valueFieldPath, String labelFieldPath) {
-        QueryExpression newDistinctExpression = new QueryExpression(name, this.pageRequest.getRootEntity(), valueFieldPath, labelFieldPath);
-        this.pageRequest.getDistinctColumns().add(newDistinctExpression);
+        QueryExpression newDistinctExpression = new QueryExpression(name, this.request.getRootEntity(), valueFieldPath, labelFieldPath);
+        this.request.getDistinctColumns().add(newDistinctExpression);
         return this;
     }
 
-    public RequestBuilder<T> addMeta(QueryExpression.Function function, String valueFieldPath) {
-        QueryExpression newMetaExpression = new QueryExpression(this.pageRequest.getRootEntity(), valueFieldPath, function);
-        this.pageRequest.getMetaColumns().add(newMetaExpression);
+    public RequestBuilder<T> addMeta(String valueFieldPath, QueryExpression.Function function) {
+        QueryExpression newMetaExpression = new QueryExpression(this.request.getRootEntity(), valueFieldPath, function);
+        this.request.getMetaColumns().add(newMetaExpression);
         return this;
     }
 
-    public RequestBuilder<T> addMeta(String labelFieldPath, QueryExpression.Function function, String valueFieldPath) {
-        QueryExpression newMetaExpression = new QueryExpression(this.pageRequest.getRootEntity(), valueFieldPath, function, labelFieldPath);
-        this.pageRequest.getMetaColumns().add(newMetaExpression);
+    public RequestBuilder<T> addMeta(String valueFieldPath, QueryExpression.Function function, String... labelFieldPath) {
+        QueryExpression newMetaExpression = new QueryExpression(this.request.getRootEntity(), valueFieldPath, function, labelFieldPath);
+        this.request.getMetaColumns().add(newMetaExpression);
         return this;
     }
 
 
-    public RequestBuilder<T> addMeta(String name, String labelFieldPath, QueryExpression.Function function, String valueFieldPath) {
-        QueryExpression newMetaExpression = new QueryExpression(name, this.pageRequest.getRootEntity(), valueFieldPath, function, labelFieldPath);
-        this.pageRequest.getMetaColumns().add(newMetaExpression);
+    public RequestBuilder<T> addMeta(String name, String valueFieldPath, QueryExpression.Function function, String... labelFieldPath) {
+        QueryExpression newMetaExpression = new QueryExpression(name, this.request.getRootEntity(), valueFieldPath, function, labelFieldPath);
+        this.request.getMetaColumns().add(newMetaExpression);
         return this;
     }
 
-    public PageRequest<T> build() {
-        return this.pageRequest;
+    public EntityPageRequest<T> build() {
+        return this.request;
     }
 
     //TODO: public static class QueryBuilder<T>

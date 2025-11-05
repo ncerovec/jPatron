@@ -141,14 +141,14 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
                 boolean sortIsPresent = QueryParamType.SORT.getName().equals(k);
                 if (valueIsPresent && sortIsPresent) {
                     var sort = parseSortExpression(dtoClass, v);
-                    requestQueryParams.setSort(sort);
+                    requestQueryParams.setLegacySort(sort);
                 }
 
                 //Simple query params
                 boolean propertyFilterPresent = Arrays.stream(QueryParamType.values()).noneMatch(q -> q.getName().equalsIgnoreCase(k));
                 if (propertyFilterPresent) {
-                    var filters = parsePropertyFilter(requestQueryParams.getFilters(), dtoClass, k, v);
-                    requestQueryParams.setFilters(filters);
+                    var filters = parsePropertyFilter(requestQueryParams.getLegacyFilters(), dtoClass, k, v);
+                    requestQueryParams.setLegacyFilters(filters);
                 }
 
                 //Filter query params
@@ -161,8 +161,8 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
                 //Search query params
                 boolean searchIsPresent = QueryParamType.SEARCH.getName().equals(k);
                 if (valueIsPresent && searchIsPresent) {
-                    var searches = parseSearchExpression(requestQueryParams.getSearches(), dtoClass, searchPaths, v);
-                    requestQueryParams.setSearches(searches);
+                    var searches = parseSearchExpression(requestQueryParams.getLegacySearches(), dtoClass, searchPaths, v);
+                    requestQueryParams.setLegacySearches(searches);
                 }
             }
         }

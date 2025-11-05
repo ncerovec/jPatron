@@ -16,7 +16,7 @@ public class JPatronApiRequest<T> extends ApiRequest<T> {
         super(rootEntity, queryParams, distinct, readOnly, null, entityGraphPaths);
     }
 
-    public enum CompoundOperator implements ApiRequest.QueryParams.CompounderEnum {
+    public enum CompoundOperator implements ApiRequest.CompounderEnum {
         AND(QueryExpression.LogicOperator.AND, "AND"),
         OR(QueryExpression.LogicOperator.OR, "OR");
 
@@ -39,7 +39,7 @@ public class JPatronApiRequest<T> extends ApiRequest<T> {
         }
     }
 
-    public enum Comparator implements ApiRequest.QueryParams.ComparatorEnum {
+    public enum Comparator implements ApiRequest.ComparatorEnum {
         IsNULL(QueryExpression.CompareOperator.IsNULL, ":#"),
         IsNotNULL(QueryExpression.CompareOperator.IsNotNULL, ":!#"),
         EQ(QueryExpression.CompareOperator.EQ, ":"),
