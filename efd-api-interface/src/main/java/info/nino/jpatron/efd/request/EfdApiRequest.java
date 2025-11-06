@@ -2,6 +2,7 @@ package info.nino.jpatron.efd.request;
 
 import info.nino.jpatron.request.ApiRequest;
 import info.nino.jpatron.request.QueryExpression;
+import org.apache.commons.lang3.NotImplementedException;
 
 /**
  * EFD API request implementation
@@ -16,14 +17,38 @@ public class EfdApiRequest<T> extends ApiRequest<T> {
         super(rootEntity, queryParams, distinct, readOnly, null, entityGraphPaths);
     }
 
-    public enum CompoundOperator implements ApiRequest.CompounderEnum {
+    @Override
+    public Class<? extends SortDirectionEnum> getSortDirectionEnum()
+    {
+        throw new NotImplementedException();
+    }
+
+    @Override
+    public Class<? extends CompounderEnum> getCompounderEnum()
+    {
+        return Compounder.class;
+    }
+
+    @Override
+    public Class<? extends ComparatorEnum> getComparatorEnum()
+    {
+        return Comparator.class;
+    }
+
+    @Override
+    public Class<? extends FunctionEnum> getFunctionEnum()
+    {
+        throw new NotImplementedException();
+    }
+
+    public enum Compounder implements ApiRequest.CompounderEnum {
         AND(QueryExpression.LogicOperator.AND, "AND"),
         OR(QueryExpression.LogicOperator.OR, "OR");
 
         private final QueryExpression.LogicOperator logicOperator;
         private final String value;
 
-        CompoundOperator(QueryExpression.LogicOperator logicOperator, String value) {
+        Compounder(QueryExpression.LogicOperator logicOperator, String value) {
             this.logicOperator = logicOperator;
             this.value = value;
         }
@@ -34,7 +59,7 @@ public class EfdApiRequest<T> extends ApiRequest<T> {
         }
 
         @Override
-        public QueryExpression.LogicOperator getLogicOperator() {
+        public QueryExpression.LogicOperator toQueryLogicOperator() {
             return logicOperator;
         }
     }
@@ -65,7 +90,7 @@ public class EfdApiRequest<T> extends ApiRequest<T> {
         }
 
         @Override
-        public QueryExpression.CompareOperator getCompareOperator() {
+        public QueryExpression.CompareOperator toQueryComparator() {
             return compareOperator;
         }
     }

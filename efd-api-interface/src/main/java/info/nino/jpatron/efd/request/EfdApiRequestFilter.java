@@ -283,8 +283,8 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
         }
 
         // Check for logical operators (AND / OR)
-        String andOperand = (" %s ").formatted(EfdApiRequest.CompoundOperator.AND.getValue());
-        String orOperand = (" %s ").formatted(EfdApiRequest.CompoundOperator.OR.getValue());
+        String andOperand = (" %s ").formatted(EfdApiRequest.Compounder.AND.getValue());
+        String orOperand = (" %s ").formatted(EfdApiRequest.Compounder.OR.getValue());
         var literalsFirstIndex = findFirstIndexesForLiteralsOnQueryRootLevel(queryTerm, andOperand, orOperand);
         int andIndex = literalsFirstIndex.get(andOperand);
         int orIndex = literalsFirstIndex.get(orOperand);
@@ -347,17 +347,15 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
             String fieldPath = termMatcher.group(1);
             this.checkIfPathAllowed(fieldPath, this.regexAllowedPaths);
 
-            EfdApiRequest.Comparator cmp = Arrays.stream(EfdApiRequest.Comparator.values())
-                    .filter(c -> c.getValue().equals(termMatcher.group(2)))
-                    .findAny().orElseThrow();
+            EfdApiRequest.Comparator cmp = ApiRequest.ValueEnum.findByValue(EfdApiRequest.Comparator.class, termMatcher.group(2));
             String value = termMatcher.group(3).trim();
 
             if (cmp == EfdApiRequest.Comparator.IN) {
                 String[] values = this.splitCSValue(value);
-                return new QueryExpression.Filter<>(clazz, fieldPath, cmp.getCompareOperator(), values);
+                return new QueryExpression.Filter<>(clazz, fieldPath, cmp.toQueryComparator(), values);
             } else {
                 value = this.removeSurroundingQuotes(value);
-                return new QueryExpression.Filter<>(clazz, fieldPath, cmp.getCompareOperator(), value);
+                return new QueryExpression.Filter<>(clazz, fieldPath, cmp.toQueryComparator(), value);
             }
         } else {
             throw new IllegalArgumentException("Term '%s' doesn't match EFD REST-API guideline syntax!".formatted(query));

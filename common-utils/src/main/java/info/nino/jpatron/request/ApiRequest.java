@@ -71,6 +71,11 @@ public abstract class ApiRequest<T> implements Serializable {
         this.entityGraphPaths = entityGraphPaths;
     }
 
+    public abstract Class<? extends SortDirectionEnum> getSortDirectionEnum();
+    public abstract Class<? extends CompounderEnum> getCompounderEnum();
+    public abstract Class<? extends ComparatorEnum> getComparatorEnum();
+    public abstract Class<? extends FunctionEnum> getFunctionEnum();
+
     /**
      * {@link ApiRequest#rootEntity}
      * @return rootEntity
@@ -359,23 +364,29 @@ public abstract class ApiRequest<T> implements Serializable {
         }
     }
 
-    public interface SortDirectionEnum {
-        QuerySort.Direction getSortDirection();
-        String getValue();
+    public interface SortDirectionEnum extends ValueEnum {
+        QuerySort.Direction toQuerySortDirection();
     }
 
-    public interface CompounderEnum {
-        QueryExpression.LogicOperator getLogicOperator();
-        String getValue();
+    public interface CompounderEnum extends ValueEnum {
+        QueryExpression.LogicOperator toQueryLogicOperator();
     }
 
-    public interface ComparatorEnum {
-        QueryExpression.CompareOperator getCompareOperator();
-        String getValue();
+    public interface ComparatorEnum extends ValueEnum {
+        QueryExpression.CompareOperator toQueryComparator();
     }
 
-    public interface FunctionEnum {
-        QueryExpression.Function getFunction();
+    public interface FunctionEnum extends ValueEnum {
+        QueryExpression.Function toQueryFunction();
+    }
+
+    public interface ValueEnum {
         String getValue();
+
+        static <T extends ValueEnum> T findByValue(Class<T> enumClass, String value) {
+            return Arrays.stream(enumClass.getEnumConstants())
+                    .filter(e -> e.getValue().equals(value))
+                    .findAny().orElseThrow();
+        }
     }
 }

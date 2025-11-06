@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import info.nino.jpatron.api.annotiation.JPatronApi;
 import info.nino.jpatron.api.annotiation.JPatronApiInject;
-import info.nino.jpatron.api.request.payload.JPatronRequestPayload;
+import info.nino.jpatron.api.request.payload.JPatronRequestDTO;
 import info.nino.jpatron.helpers.ConstantsUtil;
 import info.nino.jpatron.helpers.ReflectionHelper;
 import info.nino.jpatron.request.ApiRequest;
@@ -41,8 +41,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static info.nino.jpatron.request.QueryExpression.LABEL_PATHS_SEPARATOR;
 
 /**
  * jPatron API request filter implementation
@@ -133,12 +131,24 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         ByteArrayInputStream resetStream = new ByteArrayInputStream(requestPayloadBody.getBytes(StandardCharsets.UTF_8));
         requestContext.getContainerRequest().setEntityStream(resetStream);
 
-        JPatronRequestPayload requestPayload = mapper.readValue(requestPayloadBody, JPatronRequestPayload.class);
+        JPatronRequestDTO requestPayload = mapper.readValue(requestPayloadBody, JPatronRequestDTO.class);
         ApiRequest.QueryParams requestQueryParams = this.initializeDefaultApiRequestQueryParams(requestContext);
 
-        for(JPatronRequestPayload.JPatronMeta meta : requestPayload.metas()) {
-            requestQueryParams.getMetaColumns().add(new QueryExpression(meta.name(), requestContext.getClazz(), meta.valuePath(), meta.function(), meta.labelPaths()));
-        }
+        requestPayload.sorts().stream()
+                .map(sort -> new QuerySort(requestContext.getClazz(), sort.columnPath(), sort.direction().toQuerySortDirection()))
+                .forEach(requestQueryParams.getSorts()::add);
+
+        requestPayload.filters().stream()
+                .map(filter -> new QueryExpression.Filter(requestContext.getClazz(), filter.columnPath(), filter.comparator().toQueryComparator(), filter.values()))
+                .forEach(requestQueryParams.getFilters()::add);
+
+        requestPayload.distincts().stream()
+                .map(distinct -> new QueryExpression(distinct.name(), requestContext.getClazz(), distinct.valuePath(), distinct.labelPath()))
+                .forEach(requestQueryParams.getDistinctColumns()::add);
+
+        requestPayload.metas().stream()
+                .map(meta -> new QueryExpression(meta.name(), requestContext.getClazz(), meta.valuePath(), meta.function().toQueryFunction(), meta.labelPaths()))
+                .forEach(requestQueryParams.getMetaColumns()::add);
 
         return requestQueryParams;
     }
@@ -420,8 +430,8 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         }
 
         // Check for logical operators (AND / OR)
-        String andOperand = (" %s ").formatted(JPatronApiRequest.CompoundOperator.AND.getValue());
-        String orOperand = (" %s ").formatted(JPatronApiRequest.CompoundOperator.OR.getValue());
+        String andOperand = (" %s ").formatted(JPatronApiRequest.Compounder.AND.getValue());
+        String orOperand = (" %s ").formatted(JPatronApiRequest.Compounder.OR.getValue());
         var literalsFirstIndex = findFirstIndexesForLiteralsOnQueryRootLevel(queryTerm, andOperand, orOperand);
         int andIndex = literalsFirstIndex.get(andOperand);
         int orIndex = literalsFirstIndex.get(orOperand);
@@ -484,17 +494,15 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
             String fieldPath = termMatcher.group(1);
             this.checkIfPathAllowed(requestContext, fieldPath);
 
-            JPatronApiRequest.Comparator cmp = Arrays.stream(JPatronApiRequest.Comparator.values())
-                    .filter(c -> c.getValue().equals(termMatcher.group(2)))
-                    .findAny().orElseThrow();
+            JPatronApiRequest.Comparator cmp = ApiRequest.ValueEnum.findByValue(JPatronApiRequest.Comparator.class, termMatcher.group(2));
             String value = termMatcher.group(3).trim();
 
             if (cmp == JPatronApiRequest.Comparator.IN) {
                 String[] values = this.splitCSValue(value);
-                return new QueryExpression.Filter<>(requestContext.getClazz(), fieldPath, cmp.getCompareOperator(), values);
+                return new QueryExpression.Filter<>(requestContext.getClazz(), fieldPath, cmp.toQueryComparator(), values);
             } else {
                 value = this.removeSurroundingQuotes(value);
-                return new QueryExpression.Filter<>(requestContext.getClazz(), fieldPath, cmp.getCompareOperator(), value);
+                return new QueryExpression.Filter<>(requestContext.getClazz(), fieldPath, cmp.toQueryComparator(), value);
             }
         } else {
             throw new IllegalArgumentException("Term '%s' doesn't match JPatron REST-API guideline syntax!".formatted(query));
