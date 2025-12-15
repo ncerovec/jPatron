@@ -134,19 +134,19 @@ public class JPatronApiRequestFilter implements ContainerRequestFilter {
         JPatronRequestDTO requestPayload = mapper.readValue(requestPayloadBody, JPatronRequestDTO.class);
         ApiRequest.QueryParams requestQueryParams = this.initializeDefaultApiRequestQueryParams(requestContext);
 
-        requestPayload.sorts().stream()
+        CollectionUtils.emptyIfNull(requestPayload.sorts()).stream()
                 .map(sort -> new QuerySort(requestContext.getClazz(), sort.columnPath(), sort.direction().toQuerySortDirection()))
                 .forEach(requestQueryParams.getSorts()::add);
 
-        requestPayload.filters().stream()
-                .map(filter -> new QueryExpression.Filter(requestContext.getClazz(), filter.columnPath(), filter.comparator().toQueryComparator(), filter.values()))
+        CollectionUtils.emptyIfNull(requestPayload.filters()).stream()
+                .map(filter -> new QueryExpression.Filter<>(requestContext.getClazz(), filter.columnPath(), filter.comparator().toQueryComparator(), filter.values()))
                 .forEach(requestQueryParams.getFilters()::add);
 
-        requestPayload.distincts().stream()
+        CollectionUtils.emptyIfNull(requestPayload.distincts()).stream()
                 .map(distinct -> new QueryExpression(distinct.name(), requestContext.getClazz(), distinct.valuePath(), distinct.labelPath()))
                 .forEach(requestQueryParams.getDistinctColumns()::add);
 
-        requestPayload.metas().stream()
+        CollectionUtils.emptyIfNull(requestPayload.metas()).stream()
                 .map(meta -> new QueryExpression(meta.name(), requestContext.getClazz(), meta.valuePath(), meta.function().toQueryFunction(), meta.labelPaths()))
                 .forEach(requestQueryParams.getMetaColumns()::add);
 
