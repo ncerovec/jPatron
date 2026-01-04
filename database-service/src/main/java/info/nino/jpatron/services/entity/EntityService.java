@@ -463,6 +463,16 @@ public interface EntityService<E>
                     //(concat, nextLabel) -> cb.concat(concat, nextLabel));                       //combiner
                 }
 
+                Class<?> columnType = valueColumn.getJavaType();
+                boolean isIntegerType = Short.class.isAssignableFrom(columnType)
+                        || Integer.class.isAssignableFrom(columnType)
+                        || Long.class.isAssignableFrom(columnType)
+                        || Byte.class.isAssignableFrom(columnType);
+
+                boolean isDecimalType = Float.class.isAssignableFrom(columnType)
+                        || Double.class.isAssignableFrom(columnType)
+                        || BigDecimal.class.isAssignableFrom(columnType);
+
                 QueryExpression.Function function = metaVQ.getFunc();
                 if(function == null) throw new IllegalArgumentException(String.format("AggQuery (%s) - QueryExpression.Func must NOT be null!", EsUtil.getMetaValueKey(metaVQ)));
                 switch(function)
@@ -483,7 +493,14 @@ public interface EntityService<E>
 
                     case SUM:
                     {
-                        selectColumns = new Expression[] { cb.sum(valueColumn) };
+                        if (isIntegerType) {
+                            selectColumns = new Expression[] { cb.sum(valueColumn.as(Long.class)) };
+                        } else if (isDecimalType) {
+                            selectColumns = new Expression[] { cb.sum(valueColumn.as(Double.class)) };
+                        } else {
+                            selectColumns = new Expression[] { cb.sum(valueColumn) };
+                        }
+
                         if(labelColumns != null) selectColumns = ArrayUtils.addAll(selectColumns, labelColumns);
                         break;
                     }
