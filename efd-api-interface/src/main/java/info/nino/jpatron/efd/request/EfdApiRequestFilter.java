@@ -58,11 +58,11 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
     @Inject
     @EfdApiInject
-    Event<EfdApiRequest> requestEvent;
+    Event<EfdApiRequest<?>> requestEvent;
 
     @Inject
     @ConfigProperty(name = ConstantsUtil.EFD_API_INTERFACE_SEARCH_ESCAPE_CHARACTERS, defaultValue = DEFAULT_SEARCH_ESCAPE_CHARACTERS)
-    Instance<String[]> configPropertySearchEscapeCharacters;
+    Optional<String[]> configPropertySearchEscapeCharacters;
 
     private List<String> regexAllowedPaths = null;
     private Map<String, String> searchEscapeCharacters = null;
@@ -71,7 +71,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
     public void init() {
         this.regexAllowedPaths = RegexHelper.compileRegexWildcards(".*");
 
-        if (this.configPropertySearchEscapeCharacters.isUnsatisfied()) {
+        if (this.configPropertySearchEscapeCharacters.isEmpty()) {
             String searchEscapeCharactersConfig = System.getProperty(ConstantsUtil.EFD_API_INTERFACE_SEARCH_ESCAPE_CHARACTERS, DEFAULT_SEARCH_ESCAPE_CHARACTERS);
             this.initSearchEscapeCharactersMap(Arrays.stream(searchEscapeCharactersConfig.split(String.valueOf(ConstantsUtil.COMMA))).map(String::trim).toArray(String[]::new));
         } else {
