@@ -2,7 +2,7 @@ name: jPatron Manual Deploy
 on:
   workflow_dispatch:
     inputs:
-      branch:
+      ref:
         description: "The 'git-ref' to checkout when running Maven deploy."
         required: true
         default: "main"
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout jPatron source code
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ github.event.inputs.ref }}
 
       - name: Cache local Maven repository
         uses: actions/cache@v3
