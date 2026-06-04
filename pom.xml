@@ -65,8 +65,8 @@
         <sources-plugin.version>3.3.0</sources-plugin.version>
         <javadocs-plugin.version>3.5.0</javadocs-plugin.version>
         <gpg-plugin.version>3.1.0</gpg-plugin.version>
-        <staging-plugin.version>1.6.13</staging-plugin.version>
         <release-plugin.version>3.0.1</release-plugin.version>
+        <publish-plugin.version>0.9.0</publish-plugin.version>
 
         <!-- common dependencies versions -->
         <apache.lang.version>3.12.0</apache.lang.version>
@@ -230,26 +230,6 @@
                 <version>${resources-plugin.version}</version>
             </plugin>
             <plugin>
-                <groupId>org.sonatype.plugins</groupId>
-                <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>${staging-plugin.version}</version>
-                <extensions>true</extensions>
-                <configuration>
-                    <serverId>ossrh</serverId>
-                    <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-                    <stagingProfileId>release</stagingProfileId>
-                    <stagingRepositoryId>${project.groupId}:${project.artifactId}:${project.version}</stagingRepositoryId>
-                    <skipStaging>true</skipStaging>
-                    <keepStagingRepositoryOnCloseRuleFailure>true</keepStagingRepositoryOnCloseRuleFailure>
-                    <autoReleaseAfterClose>false</autoReleaseAfterClose>
-                    <autoDropAfterRelease>true</autoDropAfterRelease>
-                    <tags>
-                        <localUsername>${env.USER}</localUsername>
-                        <javaVersion>${java.version}</javaVersion>
-                    </tags>
-                </configuration>
-            </plugin>
-            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
                 <version>${release-plugin.version}</version>
@@ -258,6 +238,15 @@
                     <!-- <arguments>-X -e</arguments> -->
                     <releaseProfiles>release</releaseProfiles>
                     <autoVersionSubmodules>true</autoVersionSubmodules>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.9.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>maven-central</publishingServerId>
                 </configuration>
             </plugin>
         </plugins>
