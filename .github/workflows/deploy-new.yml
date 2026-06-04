@@ -1,0 +1,40 @@
+name: Publish to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "The 'git-ref' to checkout when running Maven deploy."
+        required: true
+        default: "main"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # If you use GPG signing, import your key here
+      - name: Configure GPG Key
+        uses: samuelmeuli/action-maven-publish@v1
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          nexus_username: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          nexus_password: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+
+      - name: Publish to Central Portal
+        run: mvn clean deploy -s .maven-settings.xml -B
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}

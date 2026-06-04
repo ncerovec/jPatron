@@ -2,7 +2,7 @@ name: jPatron Release
 on:
   workflow_dispatch:
     inputs:
-      branch:
+      ref:
         description: "The 'git-ref' to checkout when cutting the release."
         required: true
         default: "main"
@@ -23,7 +23,7 @@ jobs:
       - name: Checkout jPatron Source Code
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ github.event.inputs.ref }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
@@ -31,7 +31,7 @@ jobs:
           java-version: 17
           distribution: 'temurin'
           cache: 'maven'
-          server-id: ossrh # Value of the distributionManagement/repository/id field of the pom.xml
+          server-id: maven-central # Value of the distributionManagement/repository/id field of the pom.xml
           server-username: CI_DEPLOY_USERNAME # env variable for username in deploy
           server-password: CI_DEPLOY_PASSWORD # env variable for token in deploy
           gpg-private-key: ${{ secrets.OSSRH_GPG_SIGNING_KEY_TEXT }} # Value of the GPG private key to import
