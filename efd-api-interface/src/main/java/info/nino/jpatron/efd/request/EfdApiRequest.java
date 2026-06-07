@@ -6,9 +6,9 @@ import info.nino.jpatron.request.QueryExpression;
 /**
  * EFD API request implementation
  */
-public class EfdApiRequest<T> extends ApiRequest<T> {
+public class EfdApiRequest extends ApiRequest {
 
-    public EfdApiRequest(Class<T> rootEntity,
+    public EfdApiRequest(Class rootEntity,
                          ApiRequest.QueryParams queryParams,
                          boolean distinct,
                          boolean readOnly,
