@@ -11,7 +11,6 @@ import info.nino.jpatron.request.QuerySort;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.event.Event;
-import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
@@ -58,7 +57,7 @@ public class EfdApiRequestFilter implements ContainerRequestFilter {
 
     @Inject
     @EfdApiInject
-    Event<EfdApiRequest<?>> requestEvent;
+    Event<EfdApiRequest> requestEvent;
 
     @Inject
     @ConfigProperty(name = ConstantsUtil.EFD_API_INTERFACE_SEARCH_ESCAPE_CHARACTERS, defaultValue = DEFAULT_SEARCH_ESCAPE_CHARACTERS)
